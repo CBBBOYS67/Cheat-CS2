@@ -1,9 +1,11 @@
 #include "Renderer.h"
+#include "InputListener.h"
 
 void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
 {
 	switch (a_msg->type) {
 	case SKSE::MessagingInterface::kDataLoaded:
+		RE::BSInputDeviceManager::GetSingleton()->AddEventSink(InputListener::GetSingleton());
 		break;
 	case SKSE::MessagingInterface::kPostLoad:
 		break;

@@ -125,7 +125,9 @@ void Renderer::MessageCallback(SKSE::MessagingInterface::Message* msg)  //CallBa
 {
 	if (msg->type == SKSE::MessagingInterface::kDataLoaded && D3DInitHook::initialized) {
 		// Read Texture only after game engine finished load all it renderer resource.
-		ShowMeters = true;
+		auto& io = ImGui::GetIO();
+		io.MouseDrawCursor = true;
+		io.WantSetMousePos = true;
 	}
 }
 
@@ -148,6 +150,17 @@ bool Renderer::Install()
 	return true;
 }
 
+void Renderer::flip() 
+{
+	enable = !enable;
+	ImGui::GetIO().MouseDrawCursor = enable;
+	auto controlMap = RE::ControlMap::GetSingleton();
+	if (controlMap) {
+		controlMap->ignoreKeyboardMouse = enable;
+	}
+}
+
+
 float Renderer::GetResolutionScaleWidth()
 {
 	return ImGui::GetIO().DisplaySize.x / 1920.f;
@@ -161,16 +174,19 @@ float Renderer::GetResolutionScaleHeight()
 
 void Renderer::draw()
 {
-	static constexpr ImGuiWindowFlags windowFlag = ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs;
+	//static constexpr ImGuiWindowFlags windowFlag = ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration;
 
-	float screenSizeX = ImGui::GetIO().DisplaySize.x, screenSizeY = ImGui::GetIO().DisplaySize.y;
+	
+	// resize window
+	//ImGui::SetNextWindowPos(ImVec2(0, 0));
+	//ImGui::SetNextWindowSize(ImVec2(screenSizeX, screenSizeY));
 
-	ImGui::Begin("dMenu", nullptr, windowFlag);
 
 	// Add UI elements here
-	ImGui::Text("Debug: drawing dmenu down below:");
+	//ImGui::Text("sizeX: %f, sizeYL %f", screenSizeX, screenSizeY);
+	
+	if (enable) {
+		DMenu::getSingleton()->draw();
+	}
 
-	DMenu::getSingleton()->draw();
-
-	ImGui::End();
 }
