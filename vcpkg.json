@@ -1,0 +1,19 @@
+{
+  "name": "dmenu",
+  "version": "1",
+  "dependencies": [
+    "fast-cpp-csv-parser",
+    "rsm-binary-io",
+    "simpleini",
+    "spdlog",
+    "xbyak",
+    "rapidcsv",
+    {
+      "name":  "imgui",
+      "features":  [
+                       "dx11-binding",
+                       "win32-binding"
+                   ]
+    }
+  ]
+}
