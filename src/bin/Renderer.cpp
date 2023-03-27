@@ -9,6 +9,11 @@
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
+
+#include "dMenu.h"
+
+// stole this from MaxSu's detection meter
+
 namespace stl
 {
 	using namespace SKSE::stl;
@@ -94,18 +99,19 @@ void Renderer::DXGIPresentHook::thunk(std::uint32_t a_p1)
 	if (!D3DInitHook::initialized.load())
 		return;
 
+	// prologue
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
+	// do stuff
 	Renderer::draw();
 
+	// epilogue
 	ImGui::EndFrame();
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
-
-
 
 struct ImageSet
 {
@@ -114,23 +120,6 @@ struct ImageSet
 	ID3D11ShaderResourceView* my_texture = nullptr;
 };
 
-
-void Renderer::draw()
-{
-	if (!ShowMeters)
-		return;
-
-	auto UI = RE::UI::GetSingleton();
-
-	static constexpr ImGuiWindowFlags windowFlag = ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs;
-
-	float screenSizeX = ImGui::GetIO().DisplaySize.x, screenSizeY = ImGui::GetIO().DisplaySize.y;
-
-
-	ImGui::Begin("dMenu", nullptr, windowFlag);
-
-	ImGui::End();
-}
 
 void Renderer::MessageCallback(SKSE::MessagingInterface::Message* msg)  //CallBack & LoadTextureFromFile should called after resource loaded.
 {
@@ -152,6 +141,8 @@ bool Renderer::Install()
 
 	SKSE::AllocTrampoline(14 * 2);
 
+	stl::write_thunk_call<D3DInitHook>();
+	stl::write_thunk_call<DXGIPresentHook>();
 
 
 	return true;
@@ -165,4 +156,21 @@ float Renderer::GetResolutionScaleWidth()
 float Renderer::GetResolutionScaleHeight()
 {
 	return ImGui::GetIO().DisplaySize.y / 1080.f;
+}
+
+
+void Renderer::draw()
+{
+	static constexpr ImGuiWindowFlags windowFlag = ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs;
+
+	float screenSizeX = ImGui::GetIO().DisplaySize.x, screenSizeY = ImGui::GetIO().DisplaySize.y;
+
+	ImGui::Begin("dMenu", nullptr, windowFlag);
+
+	// Add UI elements here
+	ImGui::Text("Debug: drawing dmenu down below:");
+
+	DMenu::getSingleton()->draw();
+
+	ImGui::End();
 }

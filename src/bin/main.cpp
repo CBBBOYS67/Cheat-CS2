@@ -1,3 +1,5 @@
+#include "Renderer.h"
+
 void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
 {
 	switch (a_msg->type) {
@@ -12,6 +14,7 @@ void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
 
 void onSKSEInit()
 {
+	Renderer::Install();
 }
 
 namespace
