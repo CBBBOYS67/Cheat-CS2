@@ -1,41 +1,31 @@
 class DMenu
 {
 public:
-	static DMenu* getSingleton()
-	{
-		static DMenu singleton;
-		return &singleton;
-	}
-
 	/// <summary>
 	/// Handles drawing of actual dMenu elements onto the canvas. This function assumes the menu always shows up.
 	/// </summary>
-	void draw();
+	static void draw();
+
+	static ImVec2 relativeSize(float width, float height);
+	// called once the game data is loaded and d3d hook installed.
+	static void init(float a_screenWidth, float a_screenHeight);
+	
+	static inline bool initialized = false;
 
 private:
 
-	class Trainer
-	{
-	public:
-		static float* getTimeOfDay();
-		static void setTimeOfDay(float a_in);
-	};
 	// Define an enum to represent the different tabs
 	enum Tab
 	{
 		Trainer,
-		About,
+		AIM,
 		Contact,
 		Help
 	};
 
 	// Declare a variable to store the currently selected tab
-	Tab currentTab = Trainer;
+	static inline Tab currentTab = Trainer;
 
-	void menuTrainer();
+	static inline ImVec2 mainWindowSize = { 0, 0 };
 
-	void menuConfig();
-
-	void menuSetting();
-	
 };

@@ -42,6 +42,7 @@ private:
 
 	static inline bool enable = false;
 
+
 public:
 	static bool Install();
 
@@ -49,4 +50,5 @@ public:
 
 	static float GetResolutionScaleWidth();   // { return ImGui::GetIO().DisplaySize.x / 1920.f; }
 	static float GetResolutionScaleHeight();  //{ return ImGui::GetIO().DisplaySize.y / 1080.f; }
+
 };

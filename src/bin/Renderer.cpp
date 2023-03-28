@@ -184,9 +184,17 @@ void Renderer::draw()
 
 	// Add UI elements here
 	//ImGui::Text("sizeX: %f, sizeYL %f", screenSizeX, screenSizeY);
-	
+
+
+
 	if (enable) {
-		DMenu::getSingleton()->draw();
+		if (!DMenu::initialized) {
+			float screenSizeX = ImGui::GetIO().DisplaySize.x;
+			float screenSizeY = ImGui::GetIO().DisplaySize.y;
+			DMenu::init(screenSizeX, screenSizeY);
+		}
+
+		DMenu::draw();
 	}
 
 }
