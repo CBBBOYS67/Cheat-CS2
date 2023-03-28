@@ -29,3 +29,4 @@ private:
 	static inline ImVec2 mainWindowSize = { 0, 0 };
 
 };
+

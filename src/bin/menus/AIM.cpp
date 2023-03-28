@@ -6,6 +6,8 @@
 
 #include "bin/dMenu.h"
 #include <unordered_set>
+
+#include "bin/Utils.h"
 // i swear i will RE this
 inline void sendConsoleCommand(std::string a_command)
 {
@@ -40,7 +42,8 @@ static std::vector<std::pair<std::string, bool>> _types = {
 	{ "Book", false }, 
 	{ "Ingredient", false },
 	{ "Key", false },
-	{ "Misc", false }
+	{ "Misc", false },
+	{ "NPC", false }
 };
 
 static std::vector<std::pair<RE::TESFile*, bool>> _mods;
@@ -83,6 +86,7 @@ void AIM::init()
 	loadPlugins<RE::IngredientItem>(mods);
 	loadPlugins<RE::TESKey>(mods);
 	loadPlugins<RE::TESObjectMISC>(mods);
+	loadPlugins<RE::TESNPC>(mods);
 
 	for (auto mod : mods) {
 		_mods.push_back({ mod, false });
@@ -114,11 +118,16 @@ void cache()
 	if (!data || _selectedModIndex == -1) {
 		return;
 	}
-	if (_types[0].second) 
+	if (_types[7].second) {
+		cacheItems<RE::TESNPC>(data);
+		return;
+	}
+	
+	if (_types[0].second)
 		cacheItems<RE::TESObjectWEAP>(data);
-	if (_types[1].second) 
+	if (_types[1].second)
 		cacheItems<RE::TESObjectARMO>(data);
-	if (_types[2].second) 
+	if (_types[2].second)
 		cacheItems<RE::TESObjectARMA>(data);
 	if (_types[3].second)
 		cacheItems<RE::TESObjectBOOK>(data);
@@ -128,7 +137,21 @@ void cache()
 		cacheItems<RE::TESKey>(data);
 	if (_types[6].second)
 		cacheItems<RE::TESObjectMISC>(data);
-	_cached = true;
+	// filter out unplayable weapons in 2nd pass
+	for (auto it = _items.begin(); it != _items.end();) {
+		auto form = it->second;
+		auto formtype = form->GetFormType();
+		switch (formtype) {
+		case RE::FormType::Weapon:
+			if (form->As<RE::TESObjectWEAP>()->weaponData.flags.any(RE::TESObjectWEAP::Data::Flag::kNonPlayable)) {
+				it = _items.erase(it);
+				continue;
+			}
+			break;
+		}
+		it++;
+	}
+
 }
 
 void AIM::show()
@@ -153,13 +176,14 @@ void AIM::show()
 	}
 
 	// item type filtering
-	for (int i = 0; i < _types.size(); i++) {
-		if (ImGui::Checkbox(_types[i].first.data(), &_types[i].second)) {  // Weapon | Armor | Consumables
+	for (int i = 0; i < _types.size() - 1; i++) { // exclude NPC
+		if (ImGui::Checkbox(_types[i].first.data(), &_types[i].second)) {  // Weapon | Armor | Consumables ....
 			_cached = false;
 		}
-		if (i < _types.size() - 1) {
-			ImGui::SameLine();
-		}
+		ImGui::SameLine();
+	}
+	if (Utils::imgui::ToggleButton(_types[_types.size() - 1].first.data(), &_types[_types.size() - 1].second)) {
+		_cached = false;
 	}
 
 
@@ -195,7 +219,8 @@ void AIM::show()
 			// spawn item
 			uint32_t formIDuint = _selectedItem->GetFormID();
 			std::string formID = fmt::format("{:x}", formIDuint);
-			std::string cmd = "player.additem " + formID + " " + buf;
+			std::string addCmd = _selectedItem->GetFormType() == RE::FormType::NPC ? "placeatme" : "additem";
+			std::string cmd = "player." + addCmd + " " + formID + " " + buf;
 			sendConsoleCommand(cmd);
 		}
 	}

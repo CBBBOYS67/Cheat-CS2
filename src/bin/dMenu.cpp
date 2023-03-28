@@ -14,7 +14,7 @@ void DMenu::draw()
 	
 	ImGui::Begin("dMenu");
 	
-	if (ImGui::BeginTabBar("TabBar", ImGuiTabBarFlags_FittingPolicyMask_)) {
+	if (ImGui::BeginTabBar("TabBar", ImGuiTabBarFlags_FittingPolicyResizeDown)) {
 		// Render each tab as a button
 		if (ImGui::TabItemButton("Trainer", currentTab == Trainer)) {
 			currentTab = Trainer;
