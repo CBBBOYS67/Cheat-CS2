@@ -16,10 +16,10 @@ void DMenu::draw()
 	
 	if (ImGui::BeginTabBar("TabBar", ImGuiTabBarFlags_FittingPolicyResizeDown)) {
 		// Render each tab as a button
-		if (ImGui::TabItemButton("Trainer", currentTab == Trainer)) {
+		if (ImGui::TabItemButton("Trainer", ImGuiTabItemFlags_Trailing)) {
 			currentTab = Trainer;
 		}
-		if (ImGui::TabItemButton("AIM", currentTab == AIM)) {
+		if (ImGui::TabItemButton("AIM", ImGuiTabItemFlags_Trailing)) {
 			currentTab = AIM;
 		}
 		ImGui::EndTabBar();
@@ -51,6 +51,7 @@ void DMenu::init(float a_screenWidth, float a_screenHeight)
 	AIM::init();
 	INFO("DMenu initialized");
 	
+
 	initialized = true;
 }
 

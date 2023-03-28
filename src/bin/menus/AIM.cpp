@@ -81,7 +81,7 @@ void AIM::init()
 	// only show mods with valid items
 	loadPlugins<RE::TESObjectWEAP>(mods);
 	loadPlugins<RE::TESObjectARMO>(mods);
-	loadPlugins<RE::TESObjectARMA>(mods);
+	loadPlugins<RE::TESAmmo>(mods);
 	loadPlugins<RE::TESObjectBOOK>(mods);
 	loadPlugins<RE::IngredientItem>(mods);
 	loadPlugins<RE::TESKey>(mods);
@@ -128,7 +128,7 @@ void cache()
 	if (_types[1].second)
 		cacheItems<RE::TESObjectARMO>(data);
 	if (_types[2].second)
-		cacheItems<RE::TESObjectARMA>(data);
+		cacheItems<RE::TESAmmo>(data);
 	if (_types[3].second)
 		cacheItems<RE::TESObjectBOOK>(data);
 	if (_types[4].second)
@@ -182,7 +182,7 @@ void AIM::show()
 		}
 		ImGui::SameLine();
 	}
-	if (Utils::imgui::ToggleButton(_types[_types.size() - 1].first.data(), &_types[_types.size() - 1].second)) {
+	if (Utils::imgui::ToggleButton(_types[_types.size() - 1].first.c_str(), &_types[_types.size() - 1].second)) {
 		_cached = false;
 	}
 
@@ -202,6 +202,11 @@ void AIM::show()
 			if (ImGui::Selectable(_items[i].first.data())) {
 				// do something
 				_selectedItem = _items[i].second;
+			}
+			if (ImGui::IsItemHovered()) {
+				ImGui::BeginTooltip();
+				ImGui::Text(fmt::format("{:x}", _items[i].second->GetFormID()).data());
+				ImGui::EndTooltip();
 			}
 		}
 	}

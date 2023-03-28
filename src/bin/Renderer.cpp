@@ -79,6 +79,7 @@ void Renderer::D3DInitHook::thunk()
 		ERROR("ImGui initialization failed (DX11)");
 		return;
 	}
+
 	INFO("ImGui initialized!");
 
 	initialized.store(true);
@@ -90,6 +91,13 @@ void Renderer::D3DInitHook::thunk()
 			reinterpret_cast<LONG_PTR>(WndProcHook::thunk)));
 	if (!WndProcHook::func)
 		ERROR("SetWindowLongPtrA failed!");
+
+#define CHINESE_SUPPORT 1
+
+#if CHINESE_SUPPORT
+	auto& io = ImGui::GetIO();
+	io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 16.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
+#endif
 }
 
 void Renderer::DXGIPresentHook::thunk(std::uint32_t a_p1)
@@ -146,7 +154,7 @@ bool Renderer::Install()
 	stl::write_thunk_call<D3DInitHook>();
 	stl::write_thunk_call<DXGIPresentHook>();
 
-
+	
 	return true;
 }
 
