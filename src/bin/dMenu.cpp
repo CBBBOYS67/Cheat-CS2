@@ -49,6 +49,7 @@ void DMenu::init(float a_screenWidth, float a_screenHeight)
 	INFO("Initializing DMenu");
 	mainWindowSize = { float(a_screenWidth * 0.5), float(a_screenHeight * 0.7) };
 	AIM::init();
+	Trainer::init();
 	INFO("DMenu initialized");
 	
 

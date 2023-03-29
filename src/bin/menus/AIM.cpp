@@ -21,16 +21,6 @@ inline void sendConsoleCommand(std::string a_command)
 	}
 }
 
-inline size_t strl(const char* a_str)
-{
-	if (a_str == nullptr) 
-		return 0;
-	size_t len = 0;
-	while (a_str[len] != '\0' && len < 0x7FFFFFFF) {
-		len++;
-	}
-	return len;
-}
 
 static bool _init = false;
 
@@ -58,18 +48,7 @@ static ImGuiTextFilter _modFilter;
 static ImGuiTextFilter _itemFilter;
 
 
-template <class T>
-inline void loadPlugins(std::unordered_set<RE::TESFile*>& mods)
-{
-	auto data = RE::TESDataHandler::GetSingleton();
-	for (auto form : data->GetFormArray<T>()) {
-		if (form && strl(form->GetName()) != 0) {
-			if (!mods.contains(form->GetFile())) {
-				mods.insert(form->GetFile());
-			}
-		}
-	}
-}
+
 void AIM::init()
 {
 	if (_init) {
@@ -79,14 +58,14 @@ void AIM::init()
 	std::unordered_set<RE::TESFile*> mods;
 
 	// only show mods with valid items
-	loadPlugins<RE::TESObjectWEAP>(mods);
-	loadPlugins<RE::TESObjectARMO>(mods);
-	loadPlugins<RE::TESAmmo>(mods);
-	loadPlugins<RE::TESObjectBOOK>(mods);
-	loadPlugins<RE::IngredientItem>(mods);
-	loadPlugins<RE::TESKey>(mods);
-	loadPlugins<RE::TESObjectMISC>(mods);
-	loadPlugins<RE::TESNPC>(mods);
+	Utils::loadUsefulPlugins<RE::TESObjectWEAP>(mods);
+	Utils::loadUsefulPlugins<RE::TESObjectARMO>(mods);
+	Utils::loadUsefulPlugins<RE::TESAmmo>(mods);
+	Utils::loadUsefulPlugins<RE::TESObjectBOOK>(mods);
+	Utils::loadUsefulPlugins<RE::IngredientItem>(mods);
+	Utils::loadUsefulPlugins<RE::TESKey>(mods);
+	Utils::loadUsefulPlugins<RE::TESObjectMISC>(mods);
+	Utils::loadUsefulPlugins<RE::TESNPC>(mods);
 
 	for (auto mod : mods) {
 		_mods.push_back({ mod, false });
