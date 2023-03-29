@@ -97,10 +97,6 @@ void cache()
 	if (!data || _selectedModIndex == -1) {
 		return;
 	}
-	if (_types[7].second) {
-		cacheItems<RE::TESNPC>(data);
-		return;
-	}
 	
 	if (_types[0].second)
 		cacheItems<RE::TESObjectWEAP>(data);
@@ -116,6 +112,8 @@ void cache()
 		cacheItems<RE::TESKey>(data);
 	if (_types[6].second)
 		cacheItems<RE::TESObjectMISC>(data);
+	if (_types[7].second) 
+		cacheItems<RE::TESNPC>(data);
 	// filter out unplayable weapons in 2nd pass
 	for (auto it = _items.begin(); it != _items.end();) {
 		auto form = it->second;
@@ -135,10 +133,14 @@ void cache()
 
 void AIM::show()
 {
-	// Begin the filter box
+	// Use consistent padding and alignment
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 10));
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5, 5));
+
+	// Render the mod filter box
 	_modFilter.Draw("Mod Name");
 
-	// Render the dropdown menu
+	// Render the mod dropdown menu
 	if (ImGui::BeginCombo("Mods", _mods[_selectedModIndex].first->GetFilename().data())) {
 		for (int i = 0; i < _mods.size(); i++) {
 			if (_modFilter.PassFilter(_mods[i].first->GetFilename().data())) {
@@ -160,7 +162,9 @@ void AIM::show()
 	ImGui::Separator();
 	ImGui::Spacing();
 
-	for (int i = 0; i < _types.size(); i++) {  // Exclude NPC
+	// Group related controls together
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 0));
+	for (int i = 0; i < _types.size(); i++) {
 		if (ImGui::Checkbox(_types[i].first.c_str(), &_types[i].second)) {
 			_cached = false;
 		}
@@ -168,14 +172,13 @@ void AIM::show()
 			ImGui::SameLine();
 		}
 	}
+	ImGui::PopStyleVar();
 
-	if (!_cached) {
-		cache();
-	}
-
+	ImGui::Spacing();
 	// Render the list of items
 	_itemFilter.Draw("Item Name");
 
+	// Use a child window to limit the size of the item list
 	ImGui::BeginChild("Items", ImVec2(0, ImGui::GetContentRegionAvail().y * 0.7), true);
 
 	for (int i = 0; i < _items.size(); i++) {
@@ -184,7 +187,7 @@ void AIM::show()
 			if (ImGui::Selectable(_items[i].first.data())) {
 				_selectedItem = _items[i].second;
 			}
-			
+
 			if (ImGui::IsItemHovered()) {
 				ImGui::BeginTooltip();
 				ImGui::Text(fmt::format("{:x}", _items[i].second->GetFormID()).c_str());
@@ -194,27 +197,29 @@ void AIM::show()
 	}
 	ImGui::EndChild();
 
-	ImGui::Spacing();
-	ImGui::Separator();
-	ImGui::Spacing();
-
-	// Show selected item info
+	// Show selected item info and spawn button
 	if (_selectedItem != nullptr) {
 		ImGui::Text("Selected item: %s", _selectedItem->GetName());
+		ImGui::SameLine();
+		static char buf[16] = "1";
+		if (ImGui::Button("Spawn", ImVec2(ImGui::GetContentRegionAvail().x * 0.2, 0))) {
+			if (RE::PlayerCharacter::GetSingleton() != nullptr) {
+				// Spawn item
+				uint32_t formIDuint = _selectedItem->GetFormID();
+				std::string formID = fmt::format("{:x}", formIDuint);
+				std::string addCmd = _selectedItem->GetFormType() == RE::FormType::NPC ? "placeatme" : "additem";
+				std::string cmd = "player." + addCmd + " " + formID + " " + buf;
+				sendConsoleCommand(cmd);
+			}
+		}
+		ImGui::SameLine();
+		ImGui::InputText("Amount", buf, 16, ImGuiInputTextFlags_CharsDecimal);
 	}
 
-	// Button to spawn selected item
-	static char buf[16] = "1";
-	if (ImGui::Button("Spawn", ImVec2(ImGui::GetContentRegionAvail().x * 0.2, 0))) {
-		if (_selectedItem != nullptr && RE::PlayerCharacter::GetSingleton() != nullptr) {
-			// Spawn item
-			uint32_t formIDuint = _selectedItem->GetFormID();
-			std::string formID = fmt::format("{:x}", formIDuint);
-			std::string addCmd = _selectedItem->GetFormType() == RE::FormType::NPC ? "placeatme" : "additem";
-			std::string cmd = "player." + addCmd + " " + formID + " " + buf;
-			sendConsoleCommand(cmd);
-		}
+	if (!_cached) {
+		cache();
 	}
-	ImGui::SameLine();
-	ImGui::InputText("Amount", buf, 16, ImGuiInputTextFlags_CharsDecimal);
+
+	// Use consistent padding and alignment
+	ImGui::PopStyleVar(2);
 }
