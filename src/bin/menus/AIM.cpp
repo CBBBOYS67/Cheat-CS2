@@ -184,7 +184,7 @@ void AIM::show()
 			if (ImGui::Selectable(_items[i].first.data())) {
 				_selectedItem = _items[i].second;
 			}
-
+			
 			if (ImGui::IsItemHovered()) {
 				ImGui::BeginTooltip();
 				ImGui::Text(fmt::format("{:x}", _items[i].second->GetFormID()).c_str());

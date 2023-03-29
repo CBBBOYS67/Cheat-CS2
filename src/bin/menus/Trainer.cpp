@@ -12,13 +12,13 @@ namespace World
 	{
 		void show()
 		{
-			ImGui::Text("Time");
 			auto calendar = RE::Calendar::GetSingleton();
 			float* ptr = nullptr;
 			if (calendar) {
 				ptr = &(calendar->gameHour->value);
 				if (ptr) {
 					ImGui::SliderFloat("Time", ptr, 0.0f, 24.f);
+					//::Text("%f", RE::Sky::GetSingleton()->currentWeatherPct);
 					return;
 				}
 			}
@@ -29,6 +29,17 @@ namespace World
 
 	namespace Weather
 	{
+		RE::TESRegion* _currRegionCache = nullptr;  // after fw `region` field of sky gets reset. restore from this.
+		RE::TESRegion* getCurrentRegion()
+		{
+			if (RE::Sky::GetSingleton()) {
+				auto ret =  RE::Sky::GetSingleton()->region;
+				if (ret) {
+					return ret;
+				}
+			}
+			return _currRegionCache;
+		}
 		// maps to store formEditorID as names for regions and weathers as they're discarded by bethesda
 		std::unordered_map<RE::TESRegion*, std::string> _regionNames;
 		std::unordered_map<RE::TESWeather*, std::string> _weatherNames;
@@ -40,6 +51,7 @@ namespace World
 		
 		bool _showCurrRegionOnly = true; // only show weather corresponding to current region
 		
+		bool _forceWeather = false;
 
 		static std::vector<std::pair<std::string, bool>> _filters = {
 			{ "Pleasant", false },
@@ -53,6 +65,10 @@ namespace World
 		void cache()
 		{
 			_weathersToSelect.clear();
+			auto regionDataManager = RE::TESDataHandler::GetSingleton()->regionDataManager;
+			if (!regionDataManager) {
+				return;
+			}
 			for (auto weather : RE::TESDataHandler::GetSingleton()->GetFormArray<RE::TESWeather>()) {
 				if (!weather) {
 					continue;
@@ -88,6 +104,25 @@ namespace World
 						continue;
 					}
 				}
+				if (_showCurrRegionOnly) {
+					bool belongsToCurrRegion = false;
+					auto currRegion = getCurrentRegion();
+					if (currRegion) {
+						for (RE::TESRegionData* regionData : currRegion->dataList->regionDataList) {
+							if (regionData->GetType() == RE::TESRegionData::Type::kWeather) {
+								RE::TESRegionDataWeather* weatherData = regionDataManager->AsRegionDataWeather(regionData);
+								for (auto t : weatherData->weatherTypes) {
+									if (t->weather == weather) {
+										belongsToCurrRegion = true;
+									}
+								}
+							}
+						}
+					}
+					if (!belongsToCurrRegion) {
+						continue;
+					}
+				}
 				_weathersToSelect.push_back(weather);
 			}
 		}
@@ -98,55 +133,22 @@ namespace World
 			RE::TESRegion* currRegion = nullptr;
 			RE::TESWeather* currWeather = nullptr;
 			if (RE::Sky::GetSingleton()) {
-				currRegion = RE::Sky::GetSingleton()->region;
+				currRegion = getCurrentRegion();
 				currWeather = RE::Sky::GetSingleton()->currentWeather;
 			}
-			
-			ImGui::Text("Weather");
-			if (currRegion) {
-				ImGui::Text("Current region: %s", _regionNames[currRegion]);
-			}
-	
-			if (ImGui::BeginCombo("WeatherMod", _mods[_mods_i]->GetFilename().data())) {
-				for (int i = 0; i < _mods.size(); i++) {
-					bool isSelected = (_mods[_mods_i] == _mods[i]);
-					if (ImGui::Selectable(_mods[i]->GetFilename().data(), isSelected)) {
-						_mods_i = i;
-						_cached = false;
-					}
-					if (isSelected) {
-						ImGui::SetItemDefaultFocus();
-					}
-				}
-				ImGui::EndCombo();
-			}
 
-			ImGui::Text("Flags");
-			for (int i = 0; i < _filters.size(); i++) {
-				if (ImGui::Checkbox(_filters[i].first.c_str(), &_filters[i].second)) {
-					_cached = false;
-				}
-				if (i < _filters.size() - 1) {
-					ImGui::SameLine();
-				}
-			}
-			
-			if (ImGui::Checkbox("current region only", &_showCurrRegionOnly)) {
-				_cached = false;
-			}
-
-			if (!_cached) {
-				cache();
-			}
-
-			// list of weathers to choose
-			if (ImGui::BeginCombo("Weathers", _weatherNames[currWeather].data())) {
+			// List of weathers to choose
+			if (ImGui::BeginCombo("##Weathers", _weatherNames[currWeather].c_str())) {
 				for (int i = 0; i < _weathersToSelect.size(); i++) {
 					bool isSelected = (_weathersToSelect[i] == currWeather);
-					if (ImGui::Selectable(_weatherNames[_weathersToSelect[i]].data(), isSelected)) {
-						if (!isSelected) {							
-							INFO("updating weather!");
-							RE::Sky::GetSingleton()->currentWeather = _weathersToSelect[i];
+					if (ImGui::Selectable(_weatherNames[_weathersToSelect[i]].c_str(), isSelected)) {
+						if (!isSelected) {
+							_currRegionCache = getCurrentRegion();
+							if (_forceWeather) {
+								RE::Sky::GetSingleton()->ForceWeather(_weathersToSelect[i], true);
+							} else {
+								RE::Sky::GetSingleton()->SetWeather(_weathersToSelect[i], true, true);
+							}
 						}
 					}
 					if (isSelected) {
@@ -155,8 +157,46 @@ namespace World
 				}
 				ImGui::EndCombo();
 			}
+			ImGui::SameLine();
+			ImGui::Checkbox("Force Weather", &_forceWeather);
 
-			
+			// Display filtering controls
+			ImGui::Text("Flags:");
+
+			for (int i = 0; i < _filters.size(); i++) {
+				if (ImGui::Checkbox(_filters[i].first.c_str(), &_filters[i].second)) {
+					_cached = false;
+				}
+				if (i < _filters.size() - 1) {
+					ImGui::SameLine();
+				}
+			}
+
+			// Display current region
+			if (currRegion) {
+				ImGui::Text("Current Region:");
+				ImGui::SameLine();
+				ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "%s", _regionNames[currRegion]);
+			} else {
+				ImGui::Text("Current region not found");
+			}
+
+			ImGui::SameLine();
+
+			ImGui::Checkbox("Current Region Only", &_showCurrRegionOnly);
+			if (_showCurrRegionOnly) {
+				ImGui::SameLine();
+				ImGui::TextDisabled("(?!)");
+				if (ImGui::IsItemHovered()) {
+					ImGui::BeginTooltip();
+					ImGui::Text("Only display weather suitable for the current region.");
+					ImGui::EndTooltip();
+				}
+			}
+
+			if (!_cached) {
+				cache();
+			}
 		}
 
 		void init()
@@ -183,10 +223,33 @@ namespace World
 	void show() 
 	{
 		if (!RE::Sky::GetSingleton() || !RE::Sky::GetSingleton()->currentWeather) {
-			ImGui::Text("World not found");
+			ImGui::Text("World not loaded");
+			return;
 		}
+		// Use consistent padding and alignment
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 10));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5, 5));
+
+		// Indent the contents of the window
+		ImGui::Indent();
+		ImGui::Spacing();
+
+		// Display time controls
+		ImGui::Text("Time:");
 		Time::show();
+		ImGui::Spacing();
+		ImGui::Separator();
+		ImGui::Spacing();
+
+		// Display weather controls
+		ImGui::Text("Weather:");
 		Weather::show();
+
+		// Unindent the contents of the window
+		ImGui::Unindent();
+
+		// Use consistent padding and alignment
+		ImGui::PopStyleVar(2);
 	}
 
 	void init()
@@ -213,3 +276,19 @@ void Trainer::init()
 
 	INFO("Trainer initialized.");
 }
+
+
+// deprecated code
+//if (ImGui::BeginCombo("WeatherMod", _mods[_mods_i]->GetFilename().data())) {
+//	for (int i = 0; i < _mods.size(); i++) {
+//		bool isSelected = (_mods[_mods_i] == _mods[i]);
+//		if (ImGui::Selectable(_mods[i]->GetFilename().data(), isSelected)) {
+//			_mods_i = i;
+//			_cached = false;
+//		}
+//		if (isSelected) {
+//			ImGui::SetItemDefaultFocus();
+//		}
+//	}
+//	ImGui::EndCombo();
+//}
