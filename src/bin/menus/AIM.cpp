@@ -158,6 +158,7 @@ void AIM::show()
 {
 	// Begin the filter box
 	_modFilter.Draw("Mod Name");
+
 	// Render the dropdown menu
 	if (ImGui::BeginCombo("Mods", _mods[_selectedModIndex].first->GetFilename().data())) {
 		for (int i = 0; i < _mods.size(); i++) {
@@ -175,53 +176,59 @@ void AIM::show()
 		ImGui::EndCombo();
 	}
 
-	// item type filtering
-	for (int i = 0; i < _types.size() - 1; i++) { // exclude NPC
-		if (ImGui::Checkbox(_types[i].first.data(), &_types[i].second)) {  // Weapon | Armor | Consumables ....
+	// Item type filtering
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	for (int i = 0; i < _types.size(); i++) {  // Exclude NPC
+		if (ImGui::Checkbox(_types[i].first.c_str(), &_types[i].second)) {
 			_cached = false;
 		}
-		ImGui::SameLine();
+		if (i < _types.size() - 1) {
+			ImGui::SameLine();
+		}
 	}
-	if (Utils::imgui::ToggleButton(_types[_types.size() - 1].first.c_str(), &_types[_types.size() - 1].second)) {
-		_cached = false;
-	}
-
 
 	if (!_cached) {
 		cache();
 	}
 
-	// Render the list of items with 
+	// Render the list of items
 	_itemFilter.Draw("Item Name");
 
-	ImGui::BeginChild("Items", DMenu::relativeSize(0.7, 0.5), true);
+	ImGui::BeginChild("Items", ImVec2(0, ImGui::GetContentRegionAvail().y * 0.7), true);
 
 	for (int i = 0; i < _items.size(); i++) {
-		// filter
+		// Filter
 		if (_itemFilter.PassFilter(_items[i].first.data())) {
 			if (ImGui::Selectable(_items[i].first.data())) {
-				// do something
 				_selectedItem = _items[i].second;
 			}
+
 			if (ImGui::IsItemHovered()) {
 				ImGui::BeginTooltip();
-				ImGui::Text(fmt::format("{:x}", _items[i].second->GetFormID()).data());
+				ImGui::Text(fmt::format("{:x}", _items[i].second->GetFormID()).c_str());
 				ImGui::EndTooltip();
 			}
 		}
 	}
 	ImGui::EndChild();
-	
-	
+
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	// Show selected item info
 	if (_selectedItem != nullptr) {
-		ImGui::Text(_selectedItem->GetName());
+		ImGui::Text("Selected item: %s", _selectedItem->GetName());
 	}
 
+	// Button to spawn selected item
 	static char buf[16] = "1";
-	// button to spawn selected item
-	if (ImGui::Button("Spawn", DMenu::relativeSize(0.2, 0.1))) {
+	if (ImGui::Button("Spawn", ImVec2(ImGui::GetContentRegionAvail().x * 0.2, 0))) {
 		if (_selectedItem != nullptr && RE::PlayerCharacter::GetSingleton() != nullptr) {
-			// spawn item
+			// Spawn item
 			uint32_t formIDuint = _selectedItem->GetFormID();
 			std::string formID = fmt::format("{:x}", formIDuint);
 			std::string addCmd = _selectedItem->GetFormType() == RE::FormType::NPC ? "placeatme" : "additem";
