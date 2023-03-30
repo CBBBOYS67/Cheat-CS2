@@ -16,6 +16,8 @@ namespace Utils
 	namespace imgui
 	{
 		bool ToggleButton(const char* str_id, bool* v);
+
+		void HoverNote(const char* text, const char* note = "*");
 	}
 
 
@@ -62,6 +64,8 @@ public:
 	void save(bool& settingRef, const char* key);
 	void save(float& settingRef, const char* key);
 	void save(uint32_t& settingRef, const char* key);
+
+	void flush();
 
 	/*Load an integer value if present.*/
 	void load(int& settingRef, const char* key);

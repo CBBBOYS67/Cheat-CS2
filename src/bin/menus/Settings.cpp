@@ -6,33 +6,53 @@
 #include "Settings.h"
 #include "bin/Utils.h"
 
-#define SETTINGFILE_PATH "Data\\SKSE\\Plugins\\dmenu.ini"
+#define SETTINGFILE_PATH "Data\\SKSE\\Plugins\\dmenu\\dmenu.ini"
 
 namespace ini
 {
+
 	void flush()
 	{
 		settingsLoader loader(SETTINGFILE_PATH);
-		loader.setActiveSection("WindowSize");
+		loader.setActiveSection("UI");
 		loader.save(Settings::relative_window_size_h, "relative_window_size_h");
 		loader.save(Settings::relative_window_size_v, "relative_window_size_v");
+		loader.save(Settings::windowPos_x, "windowPos_x");
+		loader.save(Settings::windowPos_y, "windowPos_y");
+		loader.save(Settings::lockWindowSize, "lockWindowSize");
+		loader.save(Settings::lockWindowPos, "lockWindowPos");
+
+		loader.setActiveSection("Localization");
+		uint32_t lan = static_cast<uint32_t>(Settings::language);
+		loader.save(lan, "language");
+
+		loader.flush();
 	}
 
 	void load()
 	{
 		settingsLoader loader(SETTINGFILE_PATH);
-		loader.setActiveSection("WindowSize");
+		loader.setActiveSection("UI");
 		loader.load(Settings::relative_window_size_h, "relative_window_size_h");
 		loader.load(Settings::relative_window_size_v, "relative_window_size_v");
+		loader.load(Settings::windowPos_x, "windowPos_x");
+		loader.load(Settings::windowPos_y, "windowPos_y");
+		loader.load(Settings::lockWindowSize, "lockWindowSize");
+		loader.load(Settings::lockWindowPos, "lockWindowPos");
+
+		loader.setActiveSection("Localization");
+		uint32_t lan;
+		loader.load(lan, "language");
+		Settings::language = static_cast<Settings::Language>(lan);
 	}
 
 	void init()
 	{
-		load(); //note: load() uses another simpleinia boj just for loading
+		load();
 	}
 }
 
-namespace WindowSize
+namespace UI
 {
 	void init()
 	{
@@ -46,21 +66,56 @@ namespace WindowSize
 		Settings::relative_window_size_h = ImGui::GetWindowWidth() / parentSize.x;
 		Settings::relative_window_size_v = ImGui::GetWindowHeight() / parentSize.y;
 
+		auto windowPos = ImGui::GetWindowPos();
+		// get windowpos
+		Settings::windowPos_x = windowPos.x;
+		Settings::windowPos_y = windowPos.y;
+
 		// Display the relative sizes in real-time
 		ImGui::Text("Width: %.2f%%", Settings::relative_window_size_h * 100.0f);
 		ImGui::SameLine();
 		ImGui::Text("Height: %.2f%%", Settings::relative_window_size_v * 100.0f);
+
+		//ImGui::SameLine(ImGui::GetWindowWidth() - 100);
+		ImGui::Checkbox("Lock Size", &Settings::lockWindowSize);
+		//ImGui::PopStyleVar();
+
+		// Display the relative positions in real-time
+		ImGui::Text("X pos: %f", Settings::windowPos_x);
+		ImGui::SameLine();
+		ImGui::Text("Y pos: %f", Settings::windowPos_y);
+
+		//ImGui::SameLine(ImGui::GetWindowWidth() - 100);
+		ImGui::Checkbox("Lock Pos", &Settings::lockWindowPos);
+		//ImGui::PopStyleVar();
 	}
 }
 
 namespace Localization
 {
+
+	std::vector<std::pair<Settings::Language, std::string>> _languages = {
+		{ Settings::Language::English, "English" },
+		{ Settings::Language::ChineseSimplified, "Simplified Chinese" },
+		{ Settings::Language::ChineseTraditional, "Traditional Chinese" }
+	};
 	void init()
 	{
 	}
 
 	void show()
 	{
+		if (ImGui::BeginCombo("Language", _languages[(int)Settings::language].second.c_str())) {
+			for (int i = 0; i < _languages.size(); i++) {
+				bool isSelected = ((int)Settings::language == i);
+				if (ImGui::Selectable(_languages[i].second.c_str(), isSelected)) {
+					Settings::language = static_cast<Settings::Language>(i);
+				}
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::SameLine();
+		Utils::imgui::HoverNote("Language change takes place after game re-start.", "(!)");
 
 	}
 }
@@ -75,19 +130,15 @@ void Settings::show()
 	ImGui::Indent();
 	ImGui::Spacing();
 
-	if (ImGui::Button("Save")) {
-		ini::flush();
-	}
-
 	// Display size controls
-	ImGui::Text("Window Size:");
-	WindowSize::show();
+	ImGui::Text("UI");
+	UI::show();
 	ImGui::Spacing();
 	ImGui::Separator();
 	ImGui::Spacing();
 
 	// Display Localization controls
-	ImGui::Text("Localization:");
+	ImGui::Text("Localization");
 	Localization::show();
 	ImGui::Spacing();
 	ImGui::Separator();
@@ -96,14 +147,32 @@ void Settings::show()
 	// Unindent the contents of the window
 	ImGui::Unindent();
 
+	// Position the "Save" button at the bottom-right corner of the window
+	ImGui::SameLine(ImGui::GetWindowWidth() - 100);
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
+
+	// Set the button background and text colors
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+
+
+	if (ImGui::Button("Save", ImVec2(100, 30))) {
+		ini::flush();
+	}
+
+	// Restore the previous style colors
+	ImGui::PopStyleColor(4);
+
 	// Use consistent padding and alignment
 	ImGui::PopStyleVar(2);
 }
 
 void Settings::init()
 {
-	ini::init();
-	WindowSize::init();
+	ini::init(); // load all settings first
+	UI::init();
 	Localization::init();
 		
 	INFO("Settings initialized.");

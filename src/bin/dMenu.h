@@ -26,7 +26,6 @@ private:
 	// Declare a variable to store the currently selected tab
 	static inline Tab currentTab = Trainer;
 
-	static inline ImVec2 mainWindowSize = { 0, 0 };
 
 };
 

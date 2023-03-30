@@ -12,6 +12,8 @@
 
 #include "dMenu.h"
 
+#include "Utils.h"
+#include "menus/Settings.h"
 // stole this from MaxSu's detection meter
 
 namespace stl
@@ -92,12 +94,29 @@ void Renderer::D3DInitHook::thunk()
 	if (!WndProcHook::func)
 		ERROR("SetWindowLongPtrA failed!");
 
-#define CHINESE_SUPPORT 1
-
-#if CHINESE_SUPPORT
+// initialize font selection here
+	#define SETTINGFILE_PATH "Data\\SKSE\\Plugins\\dmenu\\dmenu.ini"
+	settingsLoader loader(SETTINGFILE_PATH);
+	loader.setActiveSection("Localization");
+	uint32_t lan;
+	loader.load(lan, "language");
+	
 	auto& io = ImGui::GetIO();
-	io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 16.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
-#endif
+	ImFont* font = nullptr;
+	switch ((Settings::Language)lan) {
+	case Settings::Language::English:
+		break;
+	case Settings::Language::ChineseSimplified:
+		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 16.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
+		break;
+	case Settings::Language::ChineseTraditional:
+		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 16.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
+		break;
+	default:
+		//unknown language
+		break;
+	}
+
 }
 
 void Renderer::DXGIPresentHook::thunk(std::uint32_t a_p1)

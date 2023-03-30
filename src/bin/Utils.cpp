@@ -45,6 +45,18 @@ namespace Utils
 			return ret;
 		}
 
+		void HoverNote(const char* text, const char* note)
+		{
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+			ImGui::Text(note);
+			ImGui::PopStyleColor();
+			if (ImGui::IsItemHovered()) {
+				ImGui::BeginTooltip();
+				ImGui::Text(text);
+				ImGui::EndTooltip();
+			}
+		}
+
 	}
 
 	std::string getFormEditorID(const RE::TESForm* a_form)
@@ -185,4 +197,9 @@ void settingsLoader::load(int& settingRef, const char* key)
 		settingRef = val;
 		_loadedSettings++;
 	}
+}
+
+void settingsLoader::flush()
+{
+	_ini.SaveFile(_settingsFile);
 }

@@ -11,16 +11,21 @@
 #include "Renderer.h"
 void DMenu::draw() 
 {
-	ImGui::SetNextWindowSize(mainWindowSize, ImGuiCond_FirstUseEver);
-	
-	ImGui::Begin("dMenu");
+	ImGuiWindowFlags windowFlags = ImGuiWindowFlags_None;
+	if (Settings::lockWindowPos) {
+		windowFlags |= ImGuiWindowFlags_NoMove;
+	}
+	if (Settings::lockWindowSize) {
+		windowFlags |= ImGuiWindowFlags_NoResize;
+	}
+	ImGui::Begin("dMenu", NULL, windowFlags);
 	
 	if (ImGui::BeginTabBar("TabBar", ImGuiTabBarFlags_FittingPolicyResizeDown)) {
 		// Render each tab as a button
-		if (ImGui::TabItemButton("Trainer", ImGuiTabItemFlags_None)) {
+		if (ImGui::TabItemButton("Trainer", ImGuiTabItemFlags_Trailing)) {
 			currentTab = Trainer;
 		}
-		if (ImGui::TabItemButton("AIM", ImGuiTabItemFlags_None)) {
+		if (ImGui::TabItemButton("AIM", ImGuiTabItemFlags_Trailing)) {
 			currentTab = AIM;
 		}
 		if (ImGui::TabItemButton("Settings", ImGuiTabItemFlags_Trailing)) {
@@ -58,7 +63,11 @@ void DMenu::init(float a_screenWidth, float a_screenHeight)
 	Trainer::init();
 	Settings::init();
 
-	mainWindowSize = { float(a_screenWidth * Settings::relative_window_size_h), float(a_screenHeight * Settings::relative_window_size_v) };
+	ImVec2 mainWindowSize = { float(a_screenWidth * Settings::relative_window_size_h), float(a_screenHeight * Settings::relative_window_size_v) };
+	ImGui::SetNextWindowSize(mainWindowSize, ImGuiCond_FirstUseEver);
+	ImVec2 mainWindowPos = { Settings::windowPos_x, Settings::windowPos_y };
+	ImGui::SetNextWindowSize(mainWindowPos, ImGuiCond_FirstUseEver);
+
 	INFO("DMenu initialized");
 	
 
