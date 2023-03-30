@@ -19,7 +19,7 @@ private:
 	{
 		Trainer,
 		AIM,
-		Contact,
+		Settings,
 		Help
 	};
 

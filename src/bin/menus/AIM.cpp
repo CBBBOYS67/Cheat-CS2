@@ -184,7 +184,9 @@ void AIM::show()
 	for (int i = 0; i < _items.size(); i++) {
 		// Filter
 		if (_itemFilter.PassFilter(_items[i].first.data())) {
-			if (ImGui::Selectable(_items[i].first.data())) {
+			ImGui::Selectable(_items[i].first.data());
+
+			if (ImGui::IsItemClicked()) {
 				_selectedItem = _items[i].second;
 			}
 
@@ -199,8 +201,9 @@ void AIM::show()
 
 	// Show selected item info and spawn button
 	if (_selectedItem != nullptr) {
-		ImGui::Text("Selected item: %s", _selectedItem->GetName());
+		ImGui::Text("Selected Item: ");
 		ImGui::SameLine();
+		ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "%s", _selectedItem->GetName());
 		static char buf[16] = "1";
 		if (ImGui::Button("Spawn", ImVec2(ImGui::GetContentRegionAvail().x * 0.2, 0))) {
 			if (RE::PlayerCharacter::GetSingleton() != nullptr) {

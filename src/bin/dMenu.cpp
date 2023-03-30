@@ -6,6 +6,7 @@
 #include "dMenu.h"
 #include "menus/Trainer.h"
 #include "menus/AIM.h"
+#include "menus/Settings.h"
 
 #include "Renderer.h"
 void DMenu::draw() 
@@ -16,11 +17,14 @@ void DMenu::draw()
 	
 	if (ImGui::BeginTabBar("TabBar", ImGuiTabBarFlags_FittingPolicyResizeDown)) {
 		// Render each tab as a button
-		if (ImGui::TabItemButton("Trainer", ImGuiTabItemFlags_Trailing)) {
+		if (ImGui::TabItemButton("Trainer", ImGuiTabItemFlags_None)) {
 			currentTab = Trainer;
 		}
-		if (ImGui::TabItemButton("AIM", ImGuiTabItemFlags_Trailing)) {
+		if (ImGui::TabItemButton("AIM", ImGuiTabItemFlags_None)) {
 			currentTab = AIM;
+		}
+		if (ImGui::TabItemButton("Settings", ImGuiTabItemFlags_Trailing)) {
+			currentTab = Settings;
 		}
 		ImGui::EndTabBar();
 	}
@@ -47,9 +51,11 @@ ImVec2 DMenu::relativeSize(float a_width, float a_height)
 void DMenu::init(float a_screenWidth, float a_screenHeight)
 {
 	INFO("Initializing DMenu");
-	mainWindowSize = { float(a_screenWidth * 0.5), float(a_screenHeight * 0.7) };
 	AIM::init();
 	Trainer::init();
+	Settings::init();
+
+	mainWindowSize = { float(a_screenWidth * Settings::relative_window_size_h), float(a_screenHeight * Settings::relative_window_size_v) };
 	INFO("DMenu initialized");
 	
 

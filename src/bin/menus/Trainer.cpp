@@ -35,6 +35,7 @@ namespace World
 			if (RE::Sky::GetSingleton()) {
 				auto ret =  RE::Sky::GetSingleton()->region;
 				if (ret) {
+					_currRegionCache = ret;
 					return ret;
 				}
 			}
@@ -143,11 +144,11 @@ namespace World
 					bool isSelected = (_weathersToSelect[i] == currWeather);
 					if (ImGui::Selectable(_weatherNames[_weathersToSelect[i]].c_str(), isSelected)) {
 						if (!isSelected) {
-							_currRegionCache = getCurrentRegion();
+							auto sky = RE::Sky::GetSingleton();
 							if (_forceWeather) {
-								RE::Sky::GetSingleton()->ForceWeather(_weathersToSelect[i], true);
+								sky->ForceWeather(_weathersToSelect[i], true);
 							} else {
-								RE::Sky::GetSingleton()->SetWeather(_weathersToSelect[i], true, true);
+								sky->SetWeather(_weathersToSelect[i], true, true);
 							}
 						}
 					}
