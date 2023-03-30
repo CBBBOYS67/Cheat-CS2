@@ -37,3 +37,38 @@ namespace Utils
 	std::string getFormEditorID(const RE::TESForm* a_form);
 }
 
+/*Helper class to load from a simple ini file.*/
+class settingsLoader
+{
+private:
+	CSimpleIniA _ini;
+	const char* _section;
+	int _loadedSettings;
+	int _savedSettings;
+	const char* _settingsFile;
+
+public:
+	settingsLoader(const char* settingsFile);
+	~settingsLoader();
+	/*Set the active section. Load() will load keys from this section.*/
+	void setActiveSection(const char* section);
+	/*Load a boolean value if present.*/
+	void load(bool& settingRef, const char* key);
+	/*Load a float value if present.*/
+	void load(float& settingRef, const char* key);
+	/*Load an unsigned int value if present.*/
+	void load(uint32_t& settingRef, const char* key);
+
+	void save(bool& settingRef, const char* key);
+	void save(float& settingRef, const char* key);
+	void save(uint32_t& settingRef, const char* key);
+
+	/*Load an integer value if present.*/
+	void load(int& settingRef, const char* key);
+
+	void log()
+	{
+		logger::info("Loaded {} settings, saved {} settings from {}.", _loadedSettings, _savedSettings, _settingsFile);
+	}
+};
+

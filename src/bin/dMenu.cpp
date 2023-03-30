@@ -37,6 +37,8 @@ void DMenu::draw()
 	case AIM:
 		AIM::show();
 		break;
+	case Settings:
+		Settings::show();
 	}
 
 	ImGui::End();
@@ -44,7 +46,8 @@ void DMenu::draw()
 
 ImVec2 DMenu::relativeSize(float a_width, float a_height)
 {
-	return ImVec2(a_width * mainWindowSize.x, a_height * mainWindowSize.y);
+	ImVec2 parentSize = ImGui::GetMainViewport()->Size;
+	return ImVec2(a_width * parentSize.x, a_height * parentSize.y);
 }
 
 

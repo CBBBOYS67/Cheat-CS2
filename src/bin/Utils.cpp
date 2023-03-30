@@ -92,3 +92,97 @@ namespace Utils
 
 
 }
+
+settingsLoader::settingsLoader(const char* settingsFile)
+{
+	_ini.LoadFile(settingsFile);
+	if (_ini.IsEmpty()) {
+		logger::info("Warning: {} is empty.", settingsFile);
+	}
+	_settingsFile = settingsFile;
+}
+
+settingsLoader::~settingsLoader()
+{
+	log();
+}
+
+
+/*Set the active section. Load() will load keys from this section.*/
+
+void settingsLoader::setActiveSection(const char* section)
+{
+	_section = section;
+}
+
+/*Load a boolean value if present.*/
+
+void settingsLoader::load(bool& settingRef, const char* key)
+{
+	if (_ini.GetValue(_section, key)) {
+		bool val = _ini.GetBoolValue(_section, key);
+		settingRef = val;
+		_loadedSettings++;
+	}
+}
+
+/*Load a float value if present.*/
+
+void settingsLoader::load(float& settingRef, const char* key)
+{
+	if (_ini.GetValue(_section, key)) {
+		float val = static_cast<float>(_ini.GetDoubleValue(_section, key));
+		settingRef = val;
+		_loadedSettings++;
+	}
+}
+
+/*Load an unsigned int value if present.*/
+
+void settingsLoader::load(uint32_t& settingRef, const char* key)
+{
+	if (_ini.GetValue(_section, key)) {
+		uint32_t val = static_cast<uint32_t>(_ini.GetDoubleValue(_section, key));
+		settingRef = val;
+		_loadedSettings++;
+	}
+}
+
+void settingsLoader::save(bool& settingRef, const char* key)
+{
+	if (_ini.GetValue(_section, key)) {
+		if (settingRef) {
+			_ini.SetValue(_section, key, "true");
+		} else {
+			_ini.SetValue(_section, key, "false");
+		}
+		_savedSettings++;
+	}
+}
+
+void settingsLoader::save(float& settingRef, const char* key)
+{
+	if (_ini.GetValue(_section, key)) {
+		_ini.SetValue(_section, key, std::to_string(settingRef).data());
+		_savedSettings++;
+	}
+}
+
+void settingsLoader::save(uint32_t& settingRef, const char* key)
+{
+	if (_ini.GetValue(_section, key)) {
+		_ini.SetValue(_section, key, std::to_string(settingRef).data());
+		_savedSettings++;
+	}
+}
+
+/*Load an integer value if present.*/
+
+void settingsLoader::load(int& settingRef, const char* key)
+{
+	if (_ini.GetValue(_section, key)) {
+		int val = static_cast<int>(_ini.GetDoubleValue(_section, key));
+		settingRef = val;
+		_loadedSettings++;
+	}
+}

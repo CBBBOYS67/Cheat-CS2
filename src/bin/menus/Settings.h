@@ -1,20 +1,21 @@
 #pragma once
 
-namespace Settings
+class Settings
 {
-	enum Language
+public:
+	enum class Language
 	{
-		English,
-		ChineseSimplified,
-		ChineseTraditional
+		English = 0,
+		ChineseSimplified = 1,
+		ChineseTraditional = 2
 	};
 
-	float relative_window_size_h;
-	float relative_window_size_v;
+	static inline float relative_window_size_h = 1.f;
+	static inline float relative_window_size_v = 1.f;
 
-	Language language;
+	static inline Language language = Language::English;
 
-	void show();
+	static void show();
 
-	void init();
-}
+	static void init();
+};
