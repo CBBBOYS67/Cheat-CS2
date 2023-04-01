@@ -7,8 +7,8 @@ namespace Hooks
 		static void install()
 		{
 			auto& trampoline = SKSE::GetTrampoline();
-			REL::Relocation<std::uintptr_t> caller_setWeather{ RELOCATION_ID(25682, 26229) };  //Up	p	Sky__Update_1403B1670+29C	call    Sky__UpdateWeather_1403B1C80
-			_updateWeather = trampoline.write_call<5>(caller_setWeather.address() + RELOCATION_OFFSET(0x29c, 0x000), updateWeather);
+			REL::Relocation<std::uintptr_t> caller_setWeather{ RELOCATION_ID(25682, 26229) };  //Up	p	Sky__Update_1403B1670+29C	call    Sky__UpdateWeather_1403B1C80 Up	p	sub_1403C8F20+3E6	call    sub_1403C9870
+			_updateWeather = trampoline.write_call<5>(caller_setWeather.address() + RELOCATION_OFFSET(0x29c, 0x3E6), updateWeather);
 			logger::info("hook:onWeatherChange");
 		}
 
