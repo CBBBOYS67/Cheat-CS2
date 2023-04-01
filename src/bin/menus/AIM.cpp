@@ -196,7 +196,6 @@ void cache()
 	if (!data || _selectedModIndex == -1) {
 		return;
 	}
-	
 	if (_types[0].second)
 		cacheItems<RE::TESObjectWEAP>(data);
 	if (_types[1].second)

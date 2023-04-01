@@ -1,12 +1,12 @@
 #include "Renderer.h"
 #include "InputListener.h"
-
+#include "Hooks.h"
 void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
 {
 	switch (a_msg->type) {
 	case SKSE::MessagingInterface::kDataLoaded:
 		RE::BSInputDeviceManager::GetSingleton()->AddEventSink(InputListener::GetSingleton());
-
+		Hooks::Install();
 		break;
 	case SKSE::MessagingInterface::kPostLoad:
 		break;

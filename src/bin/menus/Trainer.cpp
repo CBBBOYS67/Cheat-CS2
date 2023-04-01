@@ -10,6 +10,7 @@ namespace World
 {
 	namespace Time
 	{
+		bool _sliderActive = false;
 		void show()
 		{
 			auto calendar = RE::Calendar::GetSingleton();
@@ -18,7 +19,7 @@ namespace World
 				ptr = &(calendar->gameHour->value);
 				if (ptr) {
 					ImGui::SliderFloat("Time", ptr, 0.0f, 24.f);
-					//::Text("%f", RE::Sky::GetSingleton()->currentWeatherPct);
+					_sliderActive = ImGui::IsItemActive();
 					return;
 				}
 			}
@@ -52,7 +53,7 @@ namespace World
 		
 		bool _showCurrRegionOnly = true; // only show weather corresponding to current region
 		
-		bool _forceWeather = false;
+		bool _lockWeather = false;
 
 		static std::vector<std::pair<std::string, bool>> _filters = {
 			{ "Pleasant", false },
@@ -108,7 +109,7 @@ namespace World
 				if (_showCurrRegionOnly) {
 					bool belongsToCurrRegion = false;
 					auto currRegion = getCurrentRegion();
-					if (currRegion) {
+					if (currRegion) { // could've cached regionData -> weathers at the cost of a bit of extra space, but this runs fine in O(n2) since there's limited # of weathers
 						for (RE::TESRegionData* regionData : currRegion->dataList->regionDataList) {
 							if (regionData->GetType() == RE::TESRegionData::Type::kWeather) {
 								RE::TESRegionDataWeather* weatherData = regionDataManager->AsRegionDataWeather(regionData);
@@ -145,11 +146,7 @@ namespace World
 					if (ImGui::Selectable(_weatherNames[_weathersToSelect[i]].c_str(), isSelected)) {
 						if (!isSelected) {
 							auto sky = RE::Sky::GetSingleton();
-							if (_forceWeather) {
-								sky->ForceWeather(_weathersToSelect[i], true);
-							} else {
-								sky->SetWeather(_weathersToSelect[i], true, true);
-							}
+							sky->ForceWeather(_weathersToSelect[i], true);
 						}
 					}
 					if (isSelected) {
@@ -158,8 +155,8 @@ namespace World
 				}
 				ImGui::EndCombo();
 			}
-			ImGui::SameLine();
-			ImGui::Checkbox("Force Weather", &_forceWeather);
+			//ImGui::SameLine();
+			//ImGui::Checkbox("Lock Weather", &_lockWeather);
 
 			// Display filtering controls
 			ImGui::Text("Flags:");
@@ -276,6 +273,11 @@ void Trainer::init()
 
 
 	INFO("Trainer initialized.");
+}
+
+bool Trainer::isWeatherLocked()
+{
+	return World::Time::_sliderActive;
 }
 
 
