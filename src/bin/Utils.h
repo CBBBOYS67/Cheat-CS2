@@ -76,3 +76,9 @@ public:
 	}
 };
 
+
+namespace ImGui
+{
+	bool SliderFloatWithSteps(const char* label, float* v, float v_min, float v_max, float v_step);
+	void HoverNote(const char* text, const char* note = "(?)");
+}

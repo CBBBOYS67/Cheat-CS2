@@ -70,7 +70,7 @@ class ModSettings
 		float min = 0.0f;
 		float max = 1.0f;
 		float step = 0.01f;
-	
+		uint8_t precision = 2;  // number of decimal places
 	};
 	
 	class setting_textbox : public setting_base

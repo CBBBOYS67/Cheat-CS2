@@ -203,3 +203,34 @@ void settingsLoader::flush()
 {
 	_ini.SaveFile(_settingsFile);
 }
+
+namespace ImGui
+{
+	bool SliderFloatWithSteps(const char* label, float* v, float v_min, float v_max, float v_step)
+	{
+
+		char text_buf[64] = {};
+		ImFormatString(text_buf, IM_ARRAYSIZE(text_buf), "%g", *v);
+
+		// Map from [v_min,v_max] to [0,N]
+		const int countValues = int((v_max - v_min) / v_step);
+		int v_i = int((*v - v_min) / v_step);
+		const bool value_changed = SliderInt(label, &v_i, 0, countValues, text_buf);
+
+		// Remap from [0,N] to [v_min,v_max]
+		*v = v_min + float(v_i) * v_step;
+		return value_changed;
+	}
+
+	void HoverNote(const char* text, const char* note)
+	{
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+		ImGui::Text(note);
+		ImGui::PopStyleColor();
+		if (ImGui::IsItemHovered()) {
+			ImGui::BeginTooltip();
+			ImGui::Text(text);
+			ImGui::EndTooltip();
+		}
+	}
+}

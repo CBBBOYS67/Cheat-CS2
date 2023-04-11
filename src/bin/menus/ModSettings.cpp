@@ -9,6 +9,8 @@
 #include <fstream>
 #include "ModSettings.h"
 
+#include "bin/Utils.h"
+
 using json = nlohmann::json;
 
 // Initialize static members
@@ -59,13 +61,22 @@ void ModSettings::show()
 								if (ImGui::Checkbox(checkbox->name.c_str(), &checkbox->value)) {
 									flag_dirty(mod);
 								}
+								if (!checkbox->desc.empty()) {
+									ImGui::SameLine();
+									ImGui::HoverNote(checkbox->desc.c_str());
+								}
 							}
 							break;
 						case kSettingType_Slider:
 							{
 								setting_slider* slider = dynamic_cast<setting_slider*>(setting_ptr);
-								if (ImGui::SliderFloat(slider->name.c_str(), &slider->value, slider->min, slider->max)) {
+								
+								if (ImGui::SliderFloatWithSteps(slider->name.c_str(), &slider->value, slider->min, slider->max, slider->step)) {
 									flag_dirty(mod);
+								}
+								if (!slider->desc.empty()) {
+									ImGui::SameLine();
+									ImGui::HoverNote(slider->desc.c_str());
 								}
 							}
 							break;
@@ -74,6 +85,10 @@ void ModSettings::show()
 								setting_textbox* textbox = dynamic_cast<setting_textbox*>(setting_ptr);
 								if (ImGui::InputText(textbox->name.c_str(), textbox->buf, textbox->buf_size)) {
 									flag_dirty(mod);
+								}
+								if (!textbox->desc.empty()) {
+									ImGui::SameLine();
+									ImGui::HoverNote(textbox->desc.c_str());
 								}
 							}
 							break;
@@ -90,6 +105,10 @@ void ModSettings::show()
 								if (ImGui::Combo(name, &selected, cstrings.data(), cstrings.size())) {
 									dropdown->value = selected;
 									flag_dirty(mod);
+								}
+								if (!dropdown->desc.empty()) {
+									ImGui::SameLine();
+									ImGui::HoverNote(dropdown->desc.c_str());
 								}
 							}
 							break;
@@ -193,7 +212,10 @@ void ModSettings::load_mod(std::string mod_path)
 				}
 
 				s->name = setting_json["text"]["name"].get<std::string>();
-				s->desc = setting_json["text"]["desc"].get<std::string>();
+				if (setting_json["text"].contains("desc")) {
+					s->desc = setting_json["text"]["desc"].get<std::string>();
+				}
+				
 				s->ini_section = setting_json["ini"]["section"].get<std::string>();
 				s->ini_id = setting_json["ini"]["id"].get<std::string>();
 				group->settings.push_back(s);
@@ -205,7 +227,7 @@ void ModSettings::load_mod(std::string mod_path)
 		mods.push_back(mod);
 	} catch (const nlohmann::json::exception& e) {
 		// Handle error parsing JSON
-		INFO("Error parsing json: {}", e.what());
+		INFO("Error parsing {} : {}", mod_path, e.what());
 		return;
 	}
 
@@ -234,7 +256,13 @@ void ModSettings::load_ini(mod_setting* mod)
 		for (auto& setting_ptr : group->settings) {
 			// Get the value of this setting from the ini file
 			std::string value;
-			value = ini.GetValue(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str(), "");
+			if (ini.GetValue(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str(), "")) {
+				value = ini.GetValue(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str(), "");
+			} else {
+				INFO(".ini file for {} has no value for {}. Creating a new .ini file.", mod->name, setting_ptr->name);
+				construct_ini(mod);
+				return;
+			}
 			// Convert the value to the appropriate type and assign it to the setting
 			if (setting_ptr->type == kSettingType_Checkbox) {
 				dynamic_cast<setting_checkbox*>(setting_ptr)->value = (value == "true");
