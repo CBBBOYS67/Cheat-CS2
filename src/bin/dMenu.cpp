@@ -7,6 +7,7 @@
 #include "menus/Trainer.h"
 #include "menus/AIM.h"
 #include "menus/Settings.h"
+#include "menus/ModSettings.h"
 
 #include "Renderer.h"
 void DMenu::draw() 
@@ -31,6 +32,9 @@ void DMenu::draw()
 		if (ImGui::TabItemButton("Settings", ImGuiTabItemFlags_Trailing)) {
 			currentTab = Settings;
 		}
+		if (ImGui::TabItemButton("Mod Settings", ImGuiTabItemFlags_Trailing)) {
+			currentTab = ModSettings;
+		}
 		ImGui::EndTabBar();
 	}
 	
@@ -42,8 +46,13 @@ void DMenu::draw()
 	case AIM:
 		AIM::show();
 		break;
+	case ModSettings:
+		ModSettings::show();
+		break;
 	case Settings:
 		Settings::show();
+		break;
+
 	}
 
 	ImGui::End();
@@ -61,6 +70,7 @@ void DMenu::init(float a_screenWidth, float a_screenHeight)
 	INFO("Initializing DMenu");
 	AIM::init();
 	Trainer::init();
+	ModSettings::init();
 	Settings::init();
 
 	ImVec2 mainWindowSize = { float(a_screenWidth * Settings::relative_window_size_h), float(a_screenHeight * Settings::relative_window_size_v) };

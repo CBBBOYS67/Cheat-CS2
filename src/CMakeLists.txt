@@ -91,12 +91,15 @@ find_package(xbyak REQUIRED CONFIG)
 
 find_package(imgui REQUIRED)
 
+find_package(nlohmann_json REQUIRED)
+
 target_link_libraries(
 	"${PROJECT_NAME}"
 	PRIVATE
 		CommonLibSSE::CommonLibSSE
 		xbyak::xbyak
 		imgui::imgui
+		nlohmann_json::nlohmann_json
 )
 
 target_precompile_headers(

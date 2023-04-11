@@ -20,6 +20,7 @@ private:
 		Trainer,
 		AIM,
 		Settings,
+		ModSettings,
 		Help
 	};
 

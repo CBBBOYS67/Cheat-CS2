@@ -8,6 +8,7 @@
     "spdlog",
     "xbyak",
     "rapidcsv",
+    "nlohmann-json",
     {
       "name":  "imgui",
       "features":  [
