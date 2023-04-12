@@ -65,22 +65,53 @@ void ModSettings::show_saveButton()
     if (unsaved_changes) {
         ImGui::PopStyleColor(3);
     }
-     
 }
+
+void ModSettings::show_saveJsonButton()
+{
+	bool unsaved_changes = false;
+	for (auto& mod : mods) {
+		if (mod->json_dirty) {
+			unsaved_changes = true;
+			break;
+		}
+	}
+	if (unsaved_changes) {
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.3f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.8f, 0.4f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.9f, 0.5f, 1.0f));
+	}
+
+	if (ImGui::Button("Save Json", ImVec2(120, 30))) {
+		for (auto& mod : mods) {
+			if (mod->json_dirty) {
+				save_json(mod);
+				mod->json_dirty = false;
+			}
+		}
+	}
+
+	if (unsaved_changes) {
+		ImGui::PopStyleColor(3);
+	}
+}
+
 
 void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mod)
 {
 	ImGui::PushID(setting_ptr);
-	ImGui::BeginChild((setting_ptr->name + "##settings").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
+	ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, FLT_MAX));
+	ImGui::BeginChild((char)setting_ptr, ImVec2(0, 200), true);
 
 	bool incomplete = setting_ptr->incomplete();
 	if (incomplete) {
 		ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Incomplete setting");
 	}
 	// Show input fields to edit the setting name and ini id
-
-	ImGui::InputText("Name", &setting_ptr->name);
-	ImGui::InputText("Description", &setting_ptr->desc);
+	if (ImGui::InputText("Name", &setting_ptr->name))
+		mod->dirty = true;
+	if (ImGui::InputText("Description", &setting_ptr->desc)) 
+		mod->dirty = true;
 
 	int current_type = setting_ptr->type;
 
@@ -89,32 +120,41 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 	case kSettingType_Checkbox:
 		{
 			setting_checkbox* checkbox = dynamic_cast<setting_checkbox*>(setting_ptr);
-			ImGui::Checkbox("Default", &checkbox->value);
+			if (ImGui::Checkbox("Default", &checkbox->value)) {
+				mod->json_dirty = true;
+			}
 			std::string old_control_id = checkbox->control_id;
 			if (ImGui::InputText("Control ID", &checkbox->control_id)) { // on change of control id
 				if (!old_control_id.empty()) {  // remove old control id
 					m_controls.erase(old_control_id);
 				}
 				if (!checkbox->control_id.empty()) {
-					m_controls[checkbox->control_id] = checkbox;
+					m_controls[checkbox->control_id] = checkbox;  // update control id
 				}
+				mod->json_dirty = true;
 			}
 			break;
 		}
 	case kSettingType_Slider:
 		{
 			setting_slider* slider = dynamic_cast<setting_slider*>(setting_ptr);
-			ImGui::InputFloat("Default", &slider->value);
-			ImGui::InputFloat("Min", &slider->min);
-			ImGui::InputFloat("Max", &slider->max);
-			ImGui::InputFloat("Step", &slider->step);
+			if (ImGui::InputFloat("Default", &slider->value)) 
+				mod->json_dirty = true;
+			if (ImGui::InputFloat("Min", &slider->min))
+				mod->json_dirty = true;
+			if (ImGui::InputFloat("Max", &slider->max))
+				mod->json_dirty = true;
+			if (ImGui::InputFloat("Step", &slider->step))
+				mod->json_dirty = true;
 			break;
 		}
 	case kSettingType_Textbox:
 		{
 			setting_textbox* textbox = dynamic_cast<setting_textbox*>(setting_ptr);
-			ImGui::InputText("Default", &textbox->default_value);
-			ImGui::InputInt("Size", &textbox->buf_size);
+			if (ImGui::InputText("Default", &textbox->default_value))
+				mod->json_dirty = true;
+			if (ImGui::InputInt("Size", &textbox->buf_size))
+				mod->json_dirty = true;
 			break;
 		}
 	case kSettingType_Dropdown:
@@ -126,16 +166,19 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 				int buf;
 				if (ImGui::InputInt("Default", &buf, 0, 100)) {
 					dropdown->default_value = buf;
+					mod->json_dirty = true;
 				}
 				if (ImGui::Button("Add")) {
 					dropdown->options.emplace_back();
+					mod->json_dirty = true;
 				}
 				for (int i = 0; i < dropdown->options.size(); i++) {
 					ImGui::PushID(i);
-					ImGui::InputText("Option", &dropdown->options[i]);
+					if (ImGui::InputText("Option", &dropdown->options[i])) mod->json_dirty = true;
 					ImGui::SameLine();
 					if (ImGui::Button("-")) {
 						dropdown->options.erase(dropdown->options.begin() + i);
+						mod->json_dirty = true;
 					}
 					ImGui::PopID();
 				}
@@ -148,9 +191,13 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 	}
 	
 	ImGui::Text("Serialization");
-	ImGui::BeginChild((setting_ptr->name + "##ini").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
-	ImGui::InputText("ini ID", &setting_ptr->ini_id);
-	ImGui::InputText("ini Section", &setting_ptr->ini_section);
+	ImGui::BeginChild((setting_ptr->name + "##serialization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
+	if (ImGui::InputText("ini ID", &setting_ptr->ini_id))
+		mod->json_dirty = true;
+	if (ImGui::InputText("ini Section", &setting_ptr->ini_section))
+		mod->json_dirty = true;
+	if (ImGui::InputText("Game Setting", &setting_ptr->gameSetting))
+		mod->json_dirty = true;
 	ImGui::EndChild();
 
 	ImGui::EndChild();
@@ -276,10 +323,13 @@ void ModSettings::show_modSetting(mod_setting* mod)
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing, spacing));
 
 	// Button to add new group
-	if (ImGui::Button("New Group")) {
-		mod_setting::mod_setting_group* group = new mod_setting::mod_setting_group();
-		group->name = "New Group";
-		mod->groups.push_back(group);
+	if (edit_mode) {
+		if (ImGui::Button("+")) {
+			mod_setting::mod_setting_group* group = new mod_setting::mod_setting_group();
+			group->name = "New Group";
+			mod->groups.push_back(group);
+			mod->json_dirty = true;
+		}
 	}
 
 	// Iterate through each group in the mod
@@ -290,79 +340,92 @@ void ModSettings::show_modSetting(mod_setting* mod)
 		// Set collapsing header background color to transparent
 		ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
 
-		// up/down the group
-		if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
-			if (group != mod->groups.front()) {
-				auto it = std::find(mod->groups.begin(), mod->groups.end(), group);
-				std::iter_swap(it, it - 1);
+		if (edit_mode) {
+			// up/down the group
+			if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
+				if (group != mod->groups.front()) {
+					auto it = std::find(mod->groups.begin(), mod->groups.end(), group);
+					std::iter_swap(it, it - 1);
+					mod->json_dirty = true;
+				}
 			}
-		}
-		ImGui::SameLine();
-		if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
-			if (group != mod->groups.back()) {
-				auto it = std::find(mod->groups.begin(), mod->groups.end(), group);
-				std::iter_swap(it, it + 1);
+			ImGui::SameLine();
+			if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
+				if (group != mod->groups.back()) {
+					auto it = std::find(mod->groups.begin(), mod->groups.end(), group);
+					std::iter_swap(it, it + 1);
+					mod->json_dirty = true;
+				}
 			}
+			ImGui::SameLine();
+
 		}
-		ImGui::SameLine();
 
 		// Show collapsing header and child container
 		if (ImGui::CollapsingHeader(group->name.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
 			// Check if the mod settings are in edit mode and right mouse button is clicked
 			if (edit_mode && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-				ImGui::OpenPopup("Edit Group");
+				ImGui::OpenPopup("Edit Group Name");
 			}
 
 			// Context menu for editing group name
-			if (ImGui::BeginPopup("Edit Group")) {
-				ImGui::InputText("Group Name", &group->name);
+			if (ImGui::BeginPopup("Edit Group Name")) {
+				if (ImGui::InputText("Group Name", &group->name))
+					mod->json_dirty = true;
 				ImGui::EndPopup();
 			}
-			
-			ImGui::BeginChild((group->name + "##settings").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
-			
-			// button to add new setting
-			if (ImGui::Button("New Setting")) {
-				// correct popup position
-				ImGui::SetNextWindowPos(ImGui::GetCursorScreenPos());
-				ImGui::OpenPopup("New_setting");
-			}
+			ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, FLT_MAX));
 
-			if (ImGui::BeginPopup("New_setting")) {
-				if (ImGui::Selectable("Checkbox")) {
-					setting_checkbox* checkbox = new setting_checkbox();
-					checkbox->name = "New Checkbox";
-					checkbox->value = false;
-					group->settings.push_back(checkbox);
+			ImGui::BeginChild((group->name + "##settings").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysUseWindowPadding);
+			if (edit_mode) {
+				// button to add new setting
+				if (ImGui::Button("+")) {
+					// correct popup position
+					ImGui::SetNextWindowPos(ImGui::GetCursorScreenPos());
+					ImGui::OpenPopup("New_setting");
 				}
-				if (ImGui::Selectable("Slider")) {
-					setting_slider* slider = new setting_slider();
-					slider->name = "New Slider";
-					slider->value = 0.0f;
-					slider->min = 0.0f;
-					slider->max = 1.0f;
-					slider->step = 0.1f;
-					group->settings.push_back(slider);
+				if (ImGui::BeginPopup("New_setting")) {
+					if (ImGui::Selectable("Checkbox")) {
+						setting_checkbox* checkbox = new setting_checkbox();
+						checkbox->name = "New Checkbox";
+						checkbox->value = false;
+						checkbox->editing = true;
+						group->settings.push_back(checkbox);
+						mod->json_dirty = true;
+					}
+					if (ImGui::Selectable("Slider")) {
+						setting_slider* slider = new setting_slider();
+						slider->name = "New Slider";
+						slider->value = 0.0f;
+						slider->min = 0.0f;
+						slider->max = 1.0f;
+						slider->step = 0.1f;
+						slider->editing = true;
+						group->settings.push_back(slider);
+						mod->json_dirty = true;
+					}
+					if (ImGui::Selectable("Textbox")) {
+						setting_textbox* textbox = new setting_textbox();
+						textbox->name = "New Textbox";
+						textbox->value = "";
+						textbox->editing = true;
+						group->settings.push_back(textbox);
+						mod->json_dirty = true;
+					}
+					if (ImGui::Selectable("Dropdown")) {
+						setting_dropdown* dropdown = new setting_dropdown();
+						dropdown->name = "New Dropdown";
+						dropdown->value = 0;
+						dropdown->options.push_back("Option 1");
+						dropdown->options.push_back("Option 2");
+						dropdown->options.push_back("Option 3");
+						dropdown->editing = true;
+						group->settings.push_back(dropdown);
+						mod->json_dirty = true;
+					}
+					ImGui::EndPopup();
 				}
-				if (ImGui::Selectable("Textbox")) {
-					setting_textbox* textbox = new setting_textbox();
-					textbox->name = "New Textbox";
-					textbox->value = "";
-					group->settings.push_back(textbox);
-				}
-				if (ImGui::Selectable("Dropdown")) {
-					setting_dropdown* dropdown = new setting_dropdown();
-					dropdown->name = "New Dropdown";
-					dropdown->value = 0;
-					dropdown->options.push_back("Option 1");
-					dropdown->options.push_back("Option 2");
-					dropdown->options.push_back("Option 3");
-					group->settings.push_back(dropdown);
-				}
-				group->settings.back()->edit_mode = true;  // set the new setting to edit mode
-				ImGui::EndPopup();
 			}
-			
 
 			// Iterate through each setting in the group
 			for (auto& setting_ptr : group->settings) {
@@ -370,7 +433,7 @@ void ModSettings::show_modSetting(mod_setting* mod)
 				bool show = true;
 				for (auto& r : setting_ptr->req) {
 					if (m_controls.contains(r)) {
-						if (!m_controls[r]->value) {
+						if (m_controls[r]->value == false) {
 							show = false;
 							break;
 						}
@@ -384,13 +447,14 @@ void ModSettings::show_modSetting(mod_setting* mod)
 
 				// Add edit button next to the setting name
 				if (edit_mode) {
-					ImGui::ToggleButton("Edit", &setting_ptr->edit_mode);
+					ImGui::ToggleButton("Edit", &setting_ptr->editing);
 					// up/down the mod
 					ImGui::SameLine();
 					if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
 						if (setting_ptr != group->settings.front()) {
 							auto it = std::find(group->settings.begin(), group->settings.end(), setting_ptr);
 							std::iter_swap(it, it - 1);
+							mod->json_dirty = true;
 						}
 					}
 					ImGui::SameLine();
@@ -398,13 +462,14 @@ void ModSettings::show_modSetting(mod_setting* mod)
 						if (setting_ptr != group->settings.back()) {
 							auto it = std::find(group->settings.begin(), group->settings.end(), setting_ptr);
 							std::iter_swap(it, it + 1);
+							mod->json_dirty = true;
 						}
 					}
 					ImGui::SameLine();
 				}
 				
 				// Show the setting name and value
-				if (setting_ptr->edit_mode) {
+				if (setting_ptr->editing) {
 					show_setting_author(setting_ptr, mod);
 				} else {
 					show_setting_user(setting_ptr, mod);
@@ -438,6 +503,14 @@ void ModSettings::show_modSetting(mod_setting* mod)
 void ModSettings::show()
 {
 	show_saveButton();
+	if (edit_mode) {
+		show_saveJsonButton();
+	}
+	// a button on the rhs of this same line
+	ImGui::SameLine(ImGui::GetWindowWidth() - 100.0f);  // Move cursor to the right side of the window
+	ImGui::ToggleButton("Edit Config", &edit_mode);
+
+	
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 	for (auto& mod : mods) {
 		if (ImGui::CollapsingHeader(mod->name.c_str())) {
@@ -456,7 +529,7 @@ void ModSettings::init()
 	namespace fs = std::filesystem;
 	for (auto& file : std::filesystem::directory_iterator(SETTINGS_DIR)) {
 		if (file.path().extension() == ".json") {
-			load_mod(file.path().string());
+			load_json(file.path());
 		}
 	}
 
@@ -469,8 +542,9 @@ void ModSettings::init()
 	INFO("Mod settings initialized");
 }
 
-void ModSettings::load_mod(std::string mod_path)
+void ModSettings::load_json(std::filesystem::path path)
 {
+	std::string mod_path = path.string();
 	INFO("Load mod config from {}", mod_path);
 	// Load the JSON file for this mod
 	std::ifstream json_file(mod_path);
@@ -492,7 +566,9 @@ void ModSettings::load_mod(std::string mod_path)
 	mod_setting* mod = new mod_setting();
 
 	// name is .json's name
-	mod->name = mod_path.substr(mod_path.find_last_of("\\") + 1, mod_path.find_last_of("."));
+	mod->name = path.stem().string();
+	mod->json_path = SETTINGS_DIR + "\\" + path.filename().string();
+	INFO("Mod json path: {}", mod->json_path);
 	try {
 		if (mod_json.contains("ini")) {
 			mod->ini_path = mod_json["ini"].get<std::string>();
@@ -584,18 +660,19 @@ void ModSettings::load_mod(std::string mod_path)
 
 }
 
-void ModSettings::save_mod(mod_setting* mod)
+void ModSettings::save_json(mod_setting* mod)
 {
+	INFO("saving json for mod: {}", mod->name);
 	nlohmann::json mod_json;
 	mod_json["name"] = mod->name;
 	mod_json["ini"] = mod->ini_path;
-
 	for (auto& group : mod->groups) {
 		nlohmann::json group_json;
 		group_json["group"] = group->name;
 
 		for (auto& setting : group->settings) {
 			nlohmann::json setting_json;
+
 			setting_json["text"]["name"] = setting->name;
 			setting_json["text"]["desc"] = setting->desc;
 			setting_json["ini"]["section"] = setting->ini_section;
@@ -621,11 +698,13 @@ void ModSettings::save_mod(mod_setting* mod)
 				setting_json["style"]["max"] = slider_setting->max;
 				setting_json["style"]["step"] = slider_setting->step;
 				type_str = "slider";
+
 			} else if (setting->type == setting_type::kSettingType_Textbox) {
 				auto textbox_setting = dynamic_cast<setting_textbox*>(setting);
 				setting_json["default"] = textbox_setting->default_value;
 				setting_json["size"] = textbox_setting->buf_size;
 				type_str = "textbox";
+
 			} else if (setting->type == setting_type::kSettingType_Dropdown) {
 				auto dropdown_setting = dynamic_cast<setting_dropdown*>(setting);
 				setting_json["default"] = dropdown_setting->default_value;
@@ -633,8 +712,8 @@ void ModSettings::save_mod(mod_setting* mod)
 					setting_json["options"].push_back(option);
 				}
 				type_str = "dropdown";
-			}
 
+			}
 			setting_json["type"] = type_str;
 
 			if (!setting->req.empty()) {
@@ -642,11 +721,25 @@ void ModSettings::save_mod(mod_setting* mod)
 					setting_json["control"]["need"].push_back(r);
 				}
 			}
-			
-			group_json.push_back(setting_json);
-		}
 
+			group_json["settings"].push_back(setting_json);
+
+		}
 		mod_json["Groups"].push_back(group_json);
+	}
+	
+	std::ofstream json_file(mod->json_path);
+	if (!json_file.is_open()) {
+		// Handle error opening file
+		INFO("error: failed to open {}", mod->json_path);
+		return;
+	}
+
+	try {
+		json_file << mod_json;
+	} catch (const nlohmann::json::exception& e) {
+		// Handle error parsing JSON
+		ERROR("Exception dumping {} : {}", mod->json_path, e.what());
 	}
 }
 

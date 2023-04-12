@@ -51,7 +51,7 @@ class ModSettings
 		std::string gameSetting;
 		std::vector<std::string> req;
 
-		bool edit_mode = false;
+		bool editing = false;
 
 		bool incomplete();
 
@@ -115,7 +115,9 @@ class ModSettings
 		std::string name;
 		std::vector<mod_setting_group*> groups;
 		bool dirty;
+		bool json_dirty;
 		std::string ini_path;
+		std::string json_path;
 
 		std::vector<std::function<void()>> callbacks;
 	};
@@ -134,8 +136,8 @@ public:
 	
 	private:
 	/* Load a single mod from .json file*/
-	static void load_mod(std::string mod_path);
-	static void save_mod(mod_setting* mod);
+	static void load_json(std::filesystem::path a_path);
+	static void save_json(mod_setting* mod);
 	static void load_ini(mod_setting* mod);
 	static void construct_ini(mod_setting* mod);
 	static void save_ini(mod_setting* mod);
@@ -152,10 +154,11 @@ public:
 private:
 	// for show()
 	static void show_saveButton();
+	static void show_saveJsonButton();
 	static void show_modSetting(mod_setting* mod);
 	static void show_setting_author(setting_base* base, mod_setting* mod);
 	static void show_setting_user(setting_base* base, mod_setting* mod);
 	static inline std::unordered_map<std::string, setting_checkbox*> m_controls;
 
-	static inline bool edit_mode = true;
+	static inline bool edit_mode = false;
 };
