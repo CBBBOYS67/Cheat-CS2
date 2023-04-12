@@ -1,5 +1,6 @@
 #include "PCH.h"
 #include <unordered_set>
+
 class ModSettings
 {
 	class Translations
@@ -34,6 +35,7 @@ class ModSettings
 		kSettingType_Dropdown,
 		kSettingType_Invalid
 	};
+	class setting_checkbox;
 
 	class setting_base
 	{
@@ -45,12 +47,14 @@ class ModSettings
 		std::string ini_section;
 		std::string ini_id;
 
+
 		std::string gameSetting;
-		
 		std::vector<std::string> req;
-		std::vector<std::string> req_not;
-		bool req_met = false;
-		bool hide_if_no_req = false;
+
+		bool edit_mode = false;
+
+		bool incomplete();
+
 		virtual ~setting_base() = default;
 	};
 
@@ -62,6 +66,9 @@ class ModSettings
 			type = kSettingType_Checkbox;
 		}
 		bool value;
+		bool default_value;
+		std::string control_id;
+
 	};
 
 	class setting_slider : public setting_base
@@ -72,6 +79,7 @@ class ModSettings
 		float min = 0.0f;
 		float max = 1.0f;
 		float step = 0.01f;
+		float default_value;
 		uint8_t precision = 2;  // number of decimal places
 	};
 	
@@ -80,7 +88,8 @@ class ModSettings
 	public:
 		std::string value;
 		char* buf;
-		size_t buf_size;
+		int buf_size;
+		std::string default_value;
 		setting_textbox() { type = kSettingType_Textbox; }
 	};
 
@@ -89,7 +98,8 @@ class ModSettings
 	public:
 		setting_dropdown() { type = kSettingType_Dropdown; }
 		std::vector<std::string> options;
-		uint8_t value = 0;  // index into options
+		int value = 0;  // index into options
+		int default_value;
 	};
 
 	/* Settings of one mod, represented by one .json file and serialized to one .ini file.*/
@@ -125,6 +135,7 @@ public:
 	private:
 	/* Load a single mod from .json file*/
 	static void load_mod(std::string mod_path);
+	static void save_mod(mod_setting* mod);
 	static void load_ini(mod_setting* mod);
 	static void construct_ini(mod_setting* mod);
 	static void save_ini(mod_setting* mod);
@@ -133,10 +144,18 @@ public:
 	static void insert_game_setting(mod_setting* mod);
 
 public:
+	static void save_all_game_setting();
+
+public:
 	static bool API_RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback);
 
 private:
 	// for show()
 	static void show_saveButton();
 	static void show_modSetting(mod_setting* mod);
+	static void show_setting_author(setting_base* base, mod_setting* mod);
+	static void show_setting_user(setting_base* base, mod_setting* mod);
+	static inline std::unordered_map<std::string, setting_checkbox*> m_controls;
+
+	static inline bool edit_mode = true;
 };

@@ -2,6 +2,7 @@
 #include "imgui_internal.h"
 #include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
+#include "imgui_stdlib.h"
 
 
 #include "SimpleIni.h"
@@ -67,121 +68,372 @@ void ModSettings::show_saveButton()
      
 }
 
-void ModSettings::show_modSetting(mod_setting* mod)
+void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mod)
 {
+	ImGui::PushID(setting_ptr);
+	ImGui::BeginChild((setting_ptr->name + "##settings").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
 
-	// Iterate through each group in the mod
-	for (auto& group : mod->groups) {
-		ImGui::Indent();
-		ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));  // set background color alpha to 0
-		if (ImGui::CollapsingHeader(group->name.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-			ImGui::BeginChild((group->name + "##settings").c_str(), ImVec2(0, 200), true);
-			// Iterate through each setting in the group
-			for (auto& setting_ptr : group->settings) {
-				switch (setting_ptr->type) {
-				case kSettingType_Checkbox:
-					{
-						setting_checkbox* checkbox = dynamic_cast<setting_checkbox*>(setting_ptr);
-						if (ImGui::Checkbox(checkbox->name.c_str(), &checkbox->value)) {
-							mod->dirty = true;
-						}
-						if (!checkbox->desc.empty()) {
-							ImGui::SameLine();
-							ImGui::HoverNote(checkbox->desc.c_str());
-						}
+	bool incomplete = setting_ptr->incomplete();
+	if (incomplete) {
+		ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Incomplete setting");
+	}
+	// Show input fields to edit the setting name and ini id
+
+	ImGui::InputText("Name", &setting_ptr->name);
+	ImGui::InputText("Description", &setting_ptr->desc);
+
+	int current_type = setting_ptr->type;
+
+	// Show fields specific to the selected setting type
+	switch (current_type) {
+	case kSettingType_Checkbox:
+		{
+			setting_checkbox* checkbox = dynamic_cast<setting_checkbox*>(setting_ptr);
+			ImGui::Checkbox("Default", &checkbox->value);
+			std::string old_control_id = checkbox->control_id;
+			if (ImGui::InputText("Control ID", &checkbox->control_id)) { // on change of control id
+				if (!old_control_id.empty()) {  // remove old control id
+					m_controls.erase(old_control_id);
+				}
+				if (!checkbox->control_id.empty()) {
+					m_controls[checkbox->control_id] = checkbox;
+				}
+			}
+			break;
+		}
+	case kSettingType_Slider:
+		{
+			setting_slider* slider = dynamic_cast<setting_slider*>(setting_ptr);
+			ImGui::InputFloat("Default", &slider->value);
+			ImGui::InputFloat("Min", &slider->min);
+			ImGui::InputFloat("Max", &slider->max);
+			ImGui::InputFloat("Step", &slider->step);
+			break;
+		}
+	case kSettingType_Textbox:
+		{
+			setting_textbox* textbox = dynamic_cast<setting_textbox*>(setting_ptr);
+			ImGui::InputText("Default", &textbox->default_value);
+			ImGui::InputInt("Size", &textbox->buf_size);
+			break;
+		}
+	case kSettingType_Dropdown:
+		{
+			setting_dropdown* dropdown = dynamic_cast<setting_dropdown*>(setting_ptr);
+			ImGui::Text("Dropdown options");
+			ImGui::BeginChild("##dropdown_items", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize);
+			{
+				int buf;
+				if (ImGui::InputInt("Default", &buf, 0, 100)) {
+					dropdown->default_value = buf;
+				}
+				if (ImGui::Button("Add")) {
+					dropdown->options.emplace_back();
+				}
+				for (int i = 0; i < dropdown->options.size(); i++) {
+					ImGui::PushID(i);
+					ImGui::InputText("Option", &dropdown->options[i]);
+					ImGui::SameLine();
+					if (ImGui::Button("-")) {
+						dropdown->options.erase(dropdown->options.begin() + i);
 					}
-					break;
-				case kSettingType_Slider:
-					{
-						setting_slider* slider = dynamic_cast<setting_slider*>(setting_ptr);
-						bool changed = false;
-
-						if (ImGui::SliderFloatWithSteps(slider->name.c_str(), &slider->value, slider->min, slider->max, slider->step)) {
-							changed = true;
-						}
-						if (ImGui::IsItemHovered()) {
-							if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_LeftArrow))) {
-								if (slider->value > slider->min) {
-									slider->value -= slider->step;
-									changed = true;
-								}
-							}
-							if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_RightArrow))) {
-								if (slider->value < slider->max) {
-									slider->value += slider->step;
-									changed = true;
-								}
-							}
-						}
-
-						if (changed) {
-							mod->dirty = true;
-						}
-
-
-						if (!slider->desc.empty()) {
-							ImGui::SameLine();
-							ImGui::HoverNote(slider->desc.c_str());
-						}
-					}
-					break;
-				case kSettingType_Textbox:
-					{
-						setting_textbox* textbox = dynamic_cast<setting_textbox*>(setting_ptr);
-						if (ImGui::InputText(textbox->name.c_str(), textbox->buf, textbox->buf_size)) {
-							mod->dirty = true;
-						}
-						if (!textbox->desc.empty()) {
-							ImGui::SameLine();
-							ImGui::HoverNote(textbox->desc.c_str());
-						}
-					}
-					break;
-				case kSettingType_Dropdown:
-					{
-						setting_dropdown* dropdown = dynamic_cast<setting_dropdown*>(setting_ptr);
-						const char* name = dropdown->name.c_str();
-						int selected = dropdown->value;
-
-						std::vector<std::string> options = dropdown->options;
-						std::vector<const char*> cstrings;
-						for (auto& option : options) {
-							cstrings.push_back(option.c_str());
-						}
-
-						if (ImGui::BeginCombo(name, cstrings[selected])) {
-							for (int i = 0; i < options.size(); i++) {
-								bool is_selected = (selected == i);
-								if (ImGui::Selectable(cstrings[i], is_selected)) {
-									selected = i;
-									dropdown->value = selected;
-									mod->dirty = true;
-								}
-								if (is_selected) {
-									ImGui::SetItemDefaultFocus();
-								}
-							}
-							ImGui::EndCombo();
-						}
-
-						if (!dropdown->desc.empty()) {
-							ImGui::SameLine();
-							ImGui::HoverNote(dropdown->desc.c_str());
-						}
-					}
-					break;
-				default:
-					break;
+					ImGui::PopID();
 				}
 			}
 			ImGui::EndChild();
+			break;
 		}
-		ImGui::PopStyleColor();  // restore original color
+	default:
+		break;
+	}
+	
+	ImGui::Text("Serialization");
+	ImGui::BeginChild((setting_ptr->name + "##ini").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
+	ImGui::InputText("ini ID", &setting_ptr->ini_id);
+	ImGui::InputText("ini Section", &setting_ptr->ini_section);
+	ImGui::EndChild();
 
-		ImGui::Unindent();
+	ImGui::EndChild();
+	ImGui::PopID();
+}
+
+void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
+{
+	switch (setting_ptr->type) {
+	case kSettingType_Checkbox:
+		{
+			setting_checkbox* checkbox = dynamic_cast<setting_checkbox*>(setting_ptr);
+
+			if (ImGui::Checkbox(checkbox->name.c_str(), &checkbox->value)) {
+				mod->dirty = true;
+			}
+
+			if (!checkbox->desc.empty()) {
+				ImGui::SameLine();
+				ImGui::HoverNote(checkbox->desc.c_str());
+			}
+		}
+		break;
+
+	case kSettingType_Slider:
+		{
+			setting_slider* slider = dynamic_cast<setting_slider*>(setting_ptr);
+			bool changed = false;
+
+			if (ImGui::SliderFloatWithSteps(slider->name.c_str(), &slider->value, slider->min, slider->max, slider->step)) {
+				changed = true;
+			}
+
+			if (ImGui::IsItemHovered()) {
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_LeftArrow))) {
+					if (slider->value > slider->min) {
+						slider->value -= slider->step;
+						changed = true;
+					}
+				}
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_RightArrow))) {
+					if (slider->value < slider->max) {
+						slider->value += slider->step;
+						changed = true;
+					}
+				}
+			}
+
+			if (changed) {
+				mod->dirty = true;
+			}
+
+			if (!slider->desc.empty()) {
+				ImGui::SameLine();
+				ImGui::HoverNote(slider->desc.c_str());
+			}
+		}
+		break;
+
+	case kSettingType_Textbox:
+		{
+			setting_textbox* textbox = dynamic_cast<setting_textbox*>(setting_ptr);
+
+			if (ImGui::InputText(textbox->name.data(), &textbox->value)) {
+				mod->dirty = true;
+			}
+
+			if (!textbox->desc.empty()) {
+				ImGui::SameLine();
+				ImGui::HoverNote(textbox->desc.c_str());
+			}
+		}
+		break;
+
+	case kSettingType_Dropdown:
+		{
+			setting_dropdown* dropdown = dynamic_cast<setting_dropdown*>(setting_ptr);
+			const char* name = dropdown->name.c_str();
+			int selected = dropdown->value;
+
+			std::vector<std::string> options = dropdown->options;
+			std::vector<const char*> cstrings;
+			for (auto& option : options) {
+				cstrings.push_back(option.c_str());
+			}
+
+			if (ImGui::BeginCombo(name, cstrings[selected])) {
+				for (int i = 0; i < options.size(); i++) {
+					bool is_selected = (selected == i);
+
+					if (ImGui::Selectable(cstrings[i], is_selected)) {
+						selected = i;
+						dropdown->value = selected;
+						mod->dirty = true;
+					}
+
+					if (is_selected) {
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+
+				ImGui::EndCombo();
+			}
+
+			if (!dropdown->desc.empty()) {
+				ImGui::SameLine();
+				ImGui::HoverNote(dropdown->desc.c_str());
+			}
+		}
+		break;
+
+	default:
+		break;
+	}
+}
+
+void ModSettings::show_modSetting(mod_setting* mod)
+{
+	// Set window padding and item spacing
+	const float padding = 8.0f;
+	const float spacing = 8.0f;
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(padding, padding));
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing, spacing));
+
+	// Button to add new group
+	if (ImGui::Button("New Group")) {
+		mod_setting::mod_setting_group* group = new mod_setting::mod_setting_group();
+		group->name = "New Group";
+		mod->groups.push_back(group);
 	}
 
+	// Iterate through each group in the mod
+	for (auto& group : mod->groups) {
+		ImGui::PushID(group);
+
+		ImGui::Indent();
+		// Set collapsing header background color to transparent
+		ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+
+		// up/down the group
+		if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
+			if (group != mod->groups.front()) {
+				auto it = std::find(mod->groups.begin(), mod->groups.end(), group);
+				std::iter_swap(it, it - 1);
+			}
+		}
+		ImGui::SameLine();
+		if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
+			if (group != mod->groups.back()) {
+				auto it = std::find(mod->groups.begin(), mod->groups.end(), group);
+				std::iter_swap(it, it + 1);
+			}
+		}
+		ImGui::SameLine();
+
+		// Show collapsing header and child container
+		if (ImGui::CollapsingHeader(group->name.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+			// Check if the mod settings are in edit mode and right mouse button is clicked
+			if (edit_mode && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+				ImGui::OpenPopup("Edit Group");
+			}
+
+			// Context menu for editing group name
+			if (ImGui::BeginPopup("Edit Group")) {
+				ImGui::InputText("Group Name", &group->name);
+				ImGui::EndPopup();
+			}
+			
+			ImGui::BeginChild((group->name + "##settings").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
+			
+			// button to add new setting
+			if (ImGui::Button("New Setting")) {
+				// correct popup position
+				ImGui::SetNextWindowPos(ImGui::GetCursorScreenPos());
+				ImGui::OpenPopup("New_setting");
+			}
+
+			if (ImGui::BeginPopup("New_setting")) {
+				if (ImGui::Selectable("Checkbox")) {
+					setting_checkbox* checkbox = new setting_checkbox();
+					checkbox->name = "New Checkbox";
+					checkbox->value = false;
+					group->settings.push_back(checkbox);
+				}
+				if (ImGui::Selectable("Slider")) {
+					setting_slider* slider = new setting_slider();
+					slider->name = "New Slider";
+					slider->value = 0.0f;
+					slider->min = 0.0f;
+					slider->max = 1.0f;
+					slider->step = 0.1f;
+					group->settings.push_back(slider);
+				}
+				if (ImGui::Selectable("Textbox")) {
+					setting_textbox* textbox = new setting_textbox();
+					textbox->name = "New Textbox";
+					textbox->value = "";
+					group->settings.push_back(textbox);
+				}
+				if (ImGui::Selectable("Dropdown")) {
+					setting_dropdown* dropdown = new setting_dropdown();
+					dropdown->name = "New Dropdown";
+					dropdown->value = 0;
+					dropdown->options.push_back("Option 1");
+					dropdown->options.push_back("Option 2");
+					dropdown->options.push_back("Option 3");
+					group->settings.push_back(dropdown);
+				}
+				group->settings.back()->edit_mode = true;  // set the new setting to edit mode
+				ImGui::EndPopup();
+			}
+			
+
+			// Iterate through each setting in the group
+			for (auto& setting_ptr : group->settings) {
+				ImGui::PushID(setting_ptr);
+				bool show = true;
+				for (auto& r : setting_ptr->req) {
+					if (m_controls.contains(r)) {
+						if (!m_controls[r]->value) {
+							show = false;
+							break;
+						}
+					}
+				}
+				if (!show) {
+					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+					ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+					ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+				}
+
+				// Add edit button next to the setting name
+				if (edit_mode) {
+					ImGui::ToggleButton("Edit", &setting_ptr->edit_mode);
+					// up/down the mod
+					ImGui::SameLine();
+					if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
+						if (setting_ptr != group->settings.front()) {
+							auto it = std::find(group->settings.begin(), group->settings.end(), setting_ptr);
+							std::iter_swap(it, it - 1);
+						}
+					}
+					ImGui::SameLine();
+					if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
+						if (setting_ptr != group->settings.back()) {
+							auto it = std::find(group->settings.begin(), group->settings.end(), setting_ptr);
+							std::iter_swap(it, it + 1);
+						}
+					}
+					ImGui::SameLine();
+				}
+				
+				// Show the setting name and value
+				if (setting_ptr->edit_mode) {
+					show_setting_author(setting_ptr, mod);
+				} else {
+					show_setting_user(setting_ptr, mod);
+				}
+
+				if (!show) {
+					ImGui::PopStyleVar();
+					ImGui::PopItemFlag();
+					ImGui::PopStyleColor();
+				}
+				ImGui::PopID();
+			}
+
+			ImGui::EndChild();
+		}
+
+		// Restore original header color
+		ImGui::PopStyleColor();
+
+		ImGui::Unindent();
+		ImGui::PopID();
+	}
+
+	// Restore original style vars
+	ImGui::PopStyleVar(2);
+
 }
+
+
 
 void ModSettings::show()
 {
@@ -240,10 +492,11 @@ void ModSettings::load_mod(std::string mod_path)
 	mod_setting* mod = new mod_setting();
 
 	// name is .json's name
+	mod->name = mod_path.substr(mod_path.find_last_of("\\") + 1, mod_path.find_last_of("."));
 	try {
-		mod->name = mod_json["name"].get<std::string>();
-		if (mod_json.contains("iniPath")) {
-			mod->ini_path = mod_json["iniPath"].get<std::string>();
+		if (mod_json.contains("ini")) {
+			mod->ini_path = mod_json["ini"].get<std::string>();
+			INFO("mod config ini path: {}", mod->ini_path);
 		}
 		else {
 			mod->ini_path = SETTINGS_DIR + "\\ini\\" + mod->name.data() + ".ini";
@@ -258,9 +511,10 @@ void ModSettings::load_mod(std::string mod_path)
 			for (auto& setting_json : group_json["settings"]) {
 				setting_base* s = nullptr;
 				std::string type_str = setting_json["type"].get<std::string>();
-				if (type_str == "checkBox") {
+				if (type_str == "checkbox") {
 					setting_checkbox* scb = new setting_checkbox();
 					scb->value = setting_json.contains("default") ? setting_json["default"].get<bool>() : false;
+					scb->default_value = scb->value;
 					s = scb;
 				} else if (type_str == "slider") {
 					setting_slider* ssl = new setting_slider();
@@ -268,13 +522,13 @@ void ModSettings::load_mod(std::string mod_path)
 					ssl->min = setting_json["style"]["min"].get<float>();
 					ssl->max = setting_json["style"]["max"].get<float>();
 					ssl->step = setting_json["style"]["step"].get<float>();
+					ssl->default_value = ssl->value;
 					s = ssl;
 				} else if (type_str == "textbox") {
 					setting_textbox* stb = new setting_textbox();
-					size_t buf_size = setting_json.contains("size") ? setting_json["size"].get<size_t>() : 16;
-					stb->buf = (char*)calloc(buf_size, sizeof(char));
-					std::string data = setting_json.contains("default") ? setting_json["default"].get<std::string>() : "";
-					strncpy(stb->buf, data.c_str(), max(buf_size, data.size()));
+					size_t buf_size = setting_json.contains("size") ? setting_json["size"].get<size_t>() : 64;
+					stb->value = setting_json.contains("default") ? setting_json["default"].get<std::string>() : "";
+					stb->default_value = stb->value;
 					s = stb;
 				} else if (type_str == "dropdown") {
 					setting_dropdown* sdd = new setting_dropdown();
@@ -282,6 +536,7 @@ void ModSettings::load_mod(std::string mod_path)
 					for (auto& option_json : setting_json["options"]) {
 						sdd->options.push_back(option_json.get<std::string>());
 					}
+					sdd->default_value = sdd->value;
 					s = sdd;
 				} else {
 					INFO("Unknown setting type: {}", type_str);
@@ -295,6 +550,21 @@ void ModSettings::load_mod(std::string mod_path)
 
 				if (setting_json.contains("gameSetting")) {
 					s->gameSetting = setting_json["gameSetting"].get<std::string>();
+				}
+
+				if (setting_json.contains("control")) {
+					if (setting_json["control"].contains("id")) {
+						if (s->type == setting_type::kSettingType_Checkbox) {
+							m_controls.insert({ setting_json["control"]["id"].get<std::string>(), dynamic_cast<setting_checkbox*>(s) });
+							dynamic_cast<setting_checkbox*>(s)->control_id = setting_json["control"]["id"].get<std::string>();
+						}
+					}
+					if (setting_json["control"].contains("need")) {
+						for (auto& r : setting_json["control"]["need"]) {
+							std::string id = r.get<std::string>();
+							s->req.push_back(id);
+						}
+					}
 				}
 
 				s->ini_section = setting_json["ini"]["section"].get<std::string>();
@@ -314,6 +584,72 @@ void ModSettings::load_mod(std::string mod_path)
 
 }
 
+void ModSettings::save_mod(mod_setting* mod)
+{
+	nlohmann::json mod_json;
+	mod_json["name"] = mod->name;
+	mod_json["ini"] = mod->ini_path;
+
+	for (auto& group : mod->groups) {
+		nlohmann::json group_json;
+		group_json["group"] = group->name;
+
+		for (auto& setting : group->settings) {
+			nlohmann::json setting_json;
+			setting_json["text"]["name"] = setting->name;
+			setting_json["text"]["desc"] = setting->desc;
+			setting_json["ini"]["section"] = setting->ini_section;
+			setting_json["ini"]["id"] = setting->ini_id;
+
+			if (setting->gameSetting != "") {
+				setting_json["gameSetting"] = setting->gameSetting;
+			}
+
+			std::string type_str;
+
+			if (setting->type == setting_type::kSettingType_Checkbox) {
+				auto cb_setting = dynamic_cast<setting_checkbox*>(setting);
+				setting_json["default"] = cb_setting->default_value;
+				if (cb_setting->control_id != "") {
+					setting_json["control"]["id"] = cb_setting->control_id;
+				}
+				type_str = "checkbox";
+			} else if (setting->type == setting_type::kSettingType_Slider) {
+				auto slider_setting = dynamic_cast<setting_slider*>(setting);
+				setting_json["default"] = slider_setting->default_value;
+				setting_json["style"]["min"] = slider_setting->min;
+				setting_json["style"]["max"] = slider_setting->max;
+				setting_json["style"]["step"] = slider_setting->step;
+				type_str = "slider";
+			} else if (setting->type == setting_type::kSettingType_Textbox) {
+				auto textbox_setting = dynamic_cast<setting_textbox*>(setting);
+				setting_json["default"] = textbox_setting->default_value;
+				setting_json["size"] = textbox_setting->buf_size;
+				type_str = "textbox";
+			} else if (setting->type == setting_type::kSettingType_Dropdown) {
+				auto dropdown_setting = dynamic_cast<setting_dropdown*>(setting);
+				setting_json["default"] = dropdown_setting->default_value;
+				for (auto& option : dropdown_setting->options) {
+					setting_json["options"].push_back(option);
+				}
+				type_str = "dropdown";
+			}
+
+			setting_json["type"] = type_str;
+
+			if (!setting->req.empty()) {
+				for (auto& r : setting->req) {
+					setting_json["control"]["need"].push_back(r);
+				}
+			}
+			
+			group_json.push_back(setting_json);
+		}
+
+		mod_json["Groups"].push_back(group_json);
+	}
+}
+
 
 void ModSettings::load_ini(mod_setting* mod)
 {
@@ -330,7 +666,6 @@ void ModSettings::load_ini(mod_setting* mod)
 		return;
 	}
 
-	INFO("loading ini");
 	// Iterate through each group in the mod
 	for (auto& group : mod->groups) {
 		// Iterate through each setting in the group
@@ -344,7 +679,6 @@ void ModSettings::load_ini(mod_setting* mod)
 				construct_ini(mod);
 				return;
 			}
-			INFO("got value {}, {}", setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str());
 			// Convert the value to the appropriate type and assign it to the setting
 			if (setting_ptr->type == kSettingType_Checkbox) {
 				dynamic_cast<setting_checkbox*>(setting_ptr)->value = (value == "true");
@@ -357,7 +691,6 @@ void ModSettings::load_ini(mod_setting* mod)
 			}
 		}
 	}
-	INFO("ini loaded");
 }
 
 void ModSettings::construct_ini(mod_setting* mod)
@@ -479,14 +812,24 @@ void ModSettings::insert_game_setting(mod_setting* mod)
 	}
 }
 
+void ModSettings::save_all_game_setting()
+{
+	for (auto mod : mods) {
+		save_game_setting(mod);
+	}
+}
+
 bool ModSettings::API_RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback)
 {
+	INFO("Received registration for {} update.", a_mod);
 	for (auto mod : mods) {
 		if (mod->name == a_mod) {
 			mod->callbacks.push_back(a_callback);
+			INFO("Successfully added callback for {} update.", a_mod);
 			return true;
 		}
 	}
+	ERROR("{} mod not found.", a_mod);
 	return false;
 }
 
@@ -494,18 +837,24 @@ bool ModSettings::API_RegisterForSettingUpdate(std::string a_mod, std::function<
 
 namespace Example
 {
-	void RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback) 
+	bool RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback) 
 	{
 		static auto dMenu = GetModuleHandle("dmenu");
-		using _RegisterForSettingUpdate = const char* (*)(std::string, std::function<void()>);
+		using _RegisterForSettingUpdate = bool (*)(std::string, std::function<void()>);
 		static auto func = reinterpret_cast<_RegisterForSettingUpdate>(GetProcAddress(dMenu, "RegisterForSettingUpdate"));
 		if (func) {
-			func(a_mod, a_callback);
+			return func(a_mod, a_callback);
 		}
+		return false;
 	}
 }
 
 extern "C" DLLEXPORT bool RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback)
 {
 	return ModSettings::API_RegisterForSettingUpdate(a_mod, a_callback);
+}
+
+bool ModSettings::setting_base::incomplete()
+{
+	return this->name.empty() || this->ini_id.empty() || this->ini_section.empty();
 }

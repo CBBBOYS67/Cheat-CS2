@@ -15,7 +15,6 @@ namespace Utils
 {
 	namespace imgui
 	{
-		bool ToggleButton(const char* str_id, bool* v);
 
 		void HoverNote(const char* text, const char* note = "*");
 	}
@@ -81,4 +80,8 @@ namespace ImGui
 {
 	bool SliderFloatWithSteps(const char* label, float* v, float v_min, float v_max, float v_step);
 	void HoverNote(const char* text, const char* note = "(?)");
+
+	void InputTextStr(const char* label, std::string* dest, size_t max_len);
+	bool ToggleButton(const char* str_id, bool* v);
+
 }
