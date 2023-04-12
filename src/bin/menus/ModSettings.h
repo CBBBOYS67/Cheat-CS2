@@ -45,6 +45,8 @@ class ModSettings
 		std::string ini_section;
 		std::string ini_id;
 
+		std::string gameSetting;
+		
 		std::vector<std::string> req;
 		std::vector<std::string> req_not;
 		bool req_met = false;
@@ -103,6 +105,9 @@ class ModSettings
 		std::string name;
 		std::vector<mod_setting_group*> groups;
 		bool dirty;
+		std::string ini_path;
+
+		std::vector<std::function<void()>> callbacks;
 	};
 
 	/* Settings of all mods*/
@@ -122,8 +127,16 @@ public:
 	static void load_mod(std::string mod_path);
 	static void load_ini(mod_setting* mod);
 	static void construct_ini(mod_setting* mod);
+	static void save_ini(mod_setting* mod);
 
+	static void save_game_setting(mod_setting* mod);
+	static void insert_game_setting(mod_setting* mod);
+
+public:
+	static bool API_RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback);
 
 private:
-	static void flag_dirty(mod_setting* mod);
+	// for show()
+	static void show_saveButton();
+	static void show_modSetting(mod_setting* mod);
 };

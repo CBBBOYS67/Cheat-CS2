@@ -1,6 +1,7 @@
 #include "Renderer.h"
 #include "InputListener.h"
 #include "Hooks.h"
+#include "menus/ModSettings.h"
 void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
 {
 	switch (a_msg->type) {
@@ -18,6 +19,7 @@ void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
 void onSKSEInit()
 {
 	Renderer::Install();
+	ModSettings::init(); // init modsetting before everyone else
 }
 
 namespace

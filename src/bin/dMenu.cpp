@@ -22,39 +22,40 @@ void DMenu::draw()
 	ImGui::Begin("dMenu", NULL, windowFlags);
 	
 	if (ImGui::BeginTabBar("TabBar", ImGuiTabBarFlags_FittingPolicyResizeDown)) {
-		// Render each tab as a button
-		if (ImGui::TabItemButton("Trainer", ImGuiTabItemFlags_Trailing)) {
+		bool tabSelected = false;
+		tabSelected = currentTab == Tab::Trainer;
+		if (ImGui::BeginTabItem("Trainer")) {
 			currentTab = Trainer;
+			Trainer::show();
+			ImGui::EndTabItem();
 		}
-		if (ImGui::TabItemButton("AIM", ImGuiTabItemFlags_Trailing)) {
-			currentTab = AIM;
+		tabSelected = currentTab == Tab::AIM;
+		
+		if (ImGui::BeginTabItem("AIM")) {
+			currentTab = Tab::AIM;
+			AIM::show();
+			ImGui::EndTabItem();
 		}
-		if (ImGui::TabItemButton("Settings", ImGuiTabItemFlags_Trailing)) {
-			currentTab = Settings;
+		
+		tabSelected = currentTab == Tab::ModSettings;
+		if (ImGui::BeginTabItem("Mod Config")) {
+			currentTab = Tab::ModSettings;
+			ModSettings::show();
+			ImGui::EndTabItem();
 		}
-		if (ImGui::TabItemButton("Mod Settings", ImGuiTabItemFlags_Trailing)) {
-			currentTab = ModSettings;
+		
+		tabSelected = currentTab == Tab::Settings;
+		if (ImGui::BeginTabItem("Settings")) {
+			currentTab = Tab::Settings;
+			Settings::show();
+			ImGui::EndTabItem();
 		}
+		
+		
+
 		ImGui::EndTabBar();
 	}
 	
-	// Render the content based on the currently selected tab
-	switch (currentTab) {
-	case Trainer:
-		Trainer::show();
-		break;
-	case AIM:
-		AIM::show();
-		break;
-	case ModSettings:
-		ModSettings::show();
-		break;
-	case Settings:
-		Settings::show();
-		break;
-
-	}
-
 	ImGui::End();
 }
 
@@ -70,7 +71,6 @@ void DMenu::init(float a_screenWidth, float a_screenHeight)
 	INFO("Initializing DMenu");
 	AIM::init();
 	Trainer::init();
-	ModSettings::init();
 	Settings::init();
 
 	ImVec2 mainWindowSize = { float(a_screenWidth * Settings::relative_window_size_h), float(a_screenHeight * Settings::relative_window_size_v) };

@@ -208,17 +208,20 @@ namespace ImGui
 {
 	bool SliderFloatWithSteps(const char* label, float* v, float v_min, float v_max, float v_step)
 	{
-
 		char text_buf[64] = {};
 		ImFormatString(text_buf, IM_ARRAYSIZE(text_buf), "%g", *v);
 
-		// Map from [v_min,v_max] to [0,N]
-		const int countValues = int((v_max - v_min) / v_step);
-		int v_i = int((*v - v_min) / v_step);
-		const bool value_changed = SliderInt(label, &v_i, 0, countValues, text_buf);
+		// Calculate epsilon value as a fraction of the step size
+		const float epsilon = v_step * 0.001f;
 
-		// Remap from [0,N] to [v_min,v_max]
-		*v = v_min + float(v_i) * v_step;
+		// Map from [v_min,v_max] to [0,N] with epsilon correction
+		const int countValues = int((v_max - v_min) / v_step + epsilon);
+		int v_i = int((*v - v_min) / v_step + epsilon);
+		const bool value_changed = SliderInt(label, &v_i, 0, countValues, text_buf);
+		// Remap from [0,N] to [v_min,v_max] with epsilon correction
+		*v = v_min + (float(v_i) + epsilon) * v_step;
+		// eliminate rounding errors to v_step precision
+		*v = roundf(*v / v_step) * v_step;
 		return value_changed;
 	}
 
