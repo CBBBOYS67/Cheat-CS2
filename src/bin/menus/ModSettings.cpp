@@ -54,6 +54,7 @@ void ModSettings::show_saveButton()
         for (auto& mod : mods) {
             if (mod->dirty) {
                 save_ini(mod);
+				save_game_setting(mod);
                 mod->dirty = false;
 				for (auto callback : mod->callbacks) {
 					callback();
@@ -82,10 +83,10 @@ void ModSettings::show_saveJsonButton()
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.9f, 0.5f, 1.0f));
 	}
 
-	if (ImGui::Button("Save Json", ImVec2(120, 30))) {
+	if (ImGui::Button("Save Config", ImVec2(120, 30))) {
 		for (auto& mod : mods) {
 			if (mod->json_dirty) {
-				save_json(mod);
+				save_mod_config(mod);
 				mod->json_dirty = false;
 			}
 		}
@@ -229,8 +230,9 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 	if (ImGui::InputTextRequired("ini Section", &setting_ptr->ini_section))
 		mod->json_dirty = true;
 
-	if (ImGui::InputText("Game Setting", &setting_ptr->gameSetting))
+	if (ImGui::InputText("Game Setting", &setting_ptr->gameSetting)) {
 		mod->json_dirty = true;
+	}
 	ImGui::EndChild();
 
 	//ImGui::EndChild();
@@ -753,12 +755,12 @@ void ModSettings::load_json(std::filesystem::path path)
 
 }
 
-void ModSettings::save_json(mod_setting* mod)
+void ModSettings::save_mod_config(mod_setting* mod)
 {
-	INFO("saving json for mod: {}", mod->name);
 	nlohmann::json mod_json;
 	mod_json["name"] = mod->name;
 	mod_json["ini"] = mod->ini_path;
+
 	for (auto& group : mod->groups) {
 		nlohmann::json group_json;
 		group_json["group"] = group->name;
@@ -834,6 +836,11 @@ void ModSettings::save_json(mod_setting* mod)
 		// Handle error parsing JSON
 		ERROR("Exception dumping {} : {}", mod->json_path, e.what());
 	}
+
+	insert_game_setting(mod);
+	save_game_setting(mod);
+
+	INFO("Saved config for {}", mod->name);
 }
 
 
@@ -950,6 +957,7 @@ void ModSettings::save_game_setting(mod_setting* mod)
 			if (setting_ptr->gameSetting.empty()) { // no gamesetting mapping
 				continue;
 			}
+			INFO("querying setting {}", setting_ptr->name);
 			RE::Setting* s = gsc->GetSetting(setting_ptr->gameSetting.data());
 			if (!s) {
 				ERROR("Game setting not found when trying to save game setting.");
@@ -959,18 +967,30 @@ void ModSettings::save_game_setting(mod_setting* mod)
 				s->SetBool(dynamic_cast<setting_checkbox*>(setting_ptr)->value);
 			} else if (setting_ptr->type == kSettingType_Slider) {
 				float val = dynamic_cast<setting_slider*>(setting_ptr)->value;
-				s->SetFloat(val);
-				s->SetInteger((int)val);
-				s->SetUnsignedInteger((uint32_t)val);
+				switch (s->GetType()) {
+				case RE::Setting::Type::kUnsignedInteger:
+					s->SetUnsignedInteger((uint32_t)val);
+					break;
+				case RE::Setting::Type::kInteger:
+					s->SetInteger(static_cast<std::int32_t>(val));
+					break;
+				case RE::Setting::Type::kFloat:
+					s->SetFloat(val);
+					break;
+				default:
+					ERROR("Game setting variable for slider has bad type prefix. Prefix it with f(float), i(integer), or u(unsigned integer) to specify the game setting type.");
+					break;
+				}
 			} else if (setting_ptr->type == kSettingType_Textbox) {
 				s->SetString(dynamic_cast<setting_textbox*>(setting_ptr)->value.c_str());
 			} else if (setting_ptr->type == kSettingType_Dropdown) {
-				s->SetUnsignedInteger(dynamic_cast<setting_dropdown*>(setting_ptr)->value);
-				s->SetInteger(dynamic_cast<setting_dropdown*>(setting_ptr)->value); // why not
+				//s->SetUnsignedInteger(dynamic_cast<setting_dropdown*>(setting_ptr)->value);
+				s->SetInteger(dynamic_cast<setting_dropdown*>(setting_ptr)->value);
 			}
 		}
 	}
 }
+
 
 void ModSettings::insert_game_setting(mod_setting* mod) 
 {
@@ -984,6 +1004,9 @@ void ModSettings::insert_game_setting(mod_setting* mod)
 		// Iterate through each setting in the group
 		for (auto& setting_ptr : group->settings) {
 			if (setting_ptr->gameSetting.empty()) {  // no gamesetting mapping
+				continue;
+			}
+			if (gsc->GetSetting(setting_ptr->gameSetting.data())) { // setting already exists
 				continue;
 			}
 			RE::Setting* s = new RE::Setting(setting_ptr->gameSetting.c_str());
@@ -1007,6 +1030,13 @@ void ModSettings::save_all_game_setting()
 {
 	for (auto mod : mods) {
 		save_game_setting(mod);
+	}
+}
+
+void ModSettings::insert_all_game_setting()
+{
+	for (auto mod : mods) {
+		insert_game_setting(mod);
 	}
 }
 

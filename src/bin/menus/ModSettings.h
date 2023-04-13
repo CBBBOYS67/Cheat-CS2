@@ -161,16 +161,18 @@ public:
 	private:
 	/* Load a single mod from .json file*/
 	static void load_json(std::filesystem::path a_path);
-	static void save_json(mod_setting* mod);
+	static void save_mod_config(mod_setting* mod);
 	static void load_ini(mod_setting* mod);
 	static void construct_ini(mod_setting* mod);
 	static void save_ini(mod_setting* mod);
 
 	static void save_game_setting(mod_setting* mod);
+
 	static void insert_game_setting(mod_setting* mod);
 
 public:
 	static void save_all_game_setting();
+	static void insert_all_game_setting();
 
 public:
 	static bool API_RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback);
