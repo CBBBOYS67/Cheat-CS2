@@ -101,16 +101,17 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 {
 	ImGui::PushID(setting_ptr);
 	ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, FLT_MAX));
-	ImGui::BeginChild((char)setting_ptr, ImVec2(0, 200), true);
+	//bool incomplete = setting_ptr->incomplete();
+	//if (incomplete) {
+	//	ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Setting configuration incomplete. Please fill in all required fields highlighted in yellow.");
+	//}
+	ImGui::BeginChild((char)setting_ptr, ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
 
-	bool incomplete = setting_ptr->incomplete();
-	if (incomplete) {
-		ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Incomplete setting");
-	}
+
 	// Show input fields to edit the setting name and ini id
-	if (ImGui::InputText("Name", &setting_ptr->name))
+	if (ImGui::InputTextRequired("Name", &setting_ptr->name))
 		mod->dirty = true;
-	if (ImGui::InputText("Description", &setting_ptr->desc)) 
+	if (ImGui::InputText("Description", &setting_ptr->desc))
 		mod->dirty = true;
 
 	int current_type = setting_ptr->type;
@@ -120,7 +121,7 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 	case kSettingType_Checkbox:
 		{
 			setting_checkbox* checkbox = dynamic_cast<setting_checkbox*>(setting_ptr);
-			if (ImGui::Checkbox("Default", &checkbox->value)) {
+			if (ImGui::Checkbox("Default", &checkbox->default_value)) {
 				mod->json_dirty = true;
 			}
 			std::string old_control_id = checkbox->control_id;
@@ -138,7 +139,7 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 	case kSettingType_Slider:
 		{
 			setting_slider* slider = dynamic_cast<setting_slider*>(setting_ptr);
-			if (ImGui::InputFloat("Default", &slider->value)) 
+			if (ImGui::InputFloat("Default", &slider->default_value)) 
 				mod->json_dirty = true;
 			if (ImGui::InputFloat("Min", &slider->min))
 				mod->json_dirty = true;
@@ -192,11 +193,23 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 	
 	ImGui::Text("Serialization");
 	ImGui::BeginChild((setting_ptr->name + "##serialization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
+	
+	bool incomplete_ini_id = setting_ptr->ini_id.empty() || false;
+	if (incomplete_ini_id) {
+		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
+	}
 	if (ImGui::InputText("ini ID", &setting_ptr->ini_id))
 		mod->json_dirty = true;
-	if (ImGui::InputText("ini Section", &setting_ptr->ini_section))
+	
+	if (incomplete_ini_id) {
+		ImGui::PopStyleColor();
+	}
+
+
+	if (ImGui::InputTextRequired("ini Section", &setting_ptr->ini_section))
 		mod->json_dirty = true;
-	if (ImGui::InputText("Game Setting", &setting_ptr->gameSetting))
+
+	if (ImGui::InputTextRequired("Game Setting", &setting_ptr->gameSetting))
 		mod->json_dirty = true;
 	ImGui::EndChild();
 
@@ -324,7 +337,7 @@ void ModSettings::show_modSetting(mod_setting* mod)
 
 	// Button to add new group
 	if (edit_mode) {
-		if (ImGui::Button("+")) {
+		if (ImGui::Button("Add Group")) {
 			mod_setting::mod_setting_group* group = new mod_setting::mod_setting_group();
 			group->name = "New Group";
 			mod->groups.push_back(group);
@@ -365,21 +378,55 @@ void ModSettings::show_modSetting(mod_setting* mod)
 		if (ImGui::CollapsingHeader(group->name.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
 			// Check if the mod settings are in edit mode and right mouse button is clicked
 			if (edit_mode && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-				ImGui::OpenPopup("Edit Group Name");
+				ImGui::OpenPopup("Edit Group");
+				ImGui::SetNextWindowPos(ImGui::GetMousePos());
 			}
 
 			// Context menu for editing group name
-			if (ImGui::BeginPopup("Edit Group Name")) {
+			if (ImGui::BeginPopup("Edit Group")) {
 				if (ImGui::InputText("Group Name", &group->name))
 					mod->json_dirty = true;
+				// push red color for delete group button
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.1f, 0.15f, 1.0f));
+				if (ImGui::Button("Delete Group")) {
+					ImGui::OpenPopup("Delete Group confirmation");
+					ImGui::SetNextWindowPos(ImGui::GetMousePos());
+				}
+				ImGui::PopStyleColor();
+				if (ImGui::BeginPopupModal("Delete Group confirmation", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+					ImGui::Text("Are you sure you want to delete this group?");
+					ImGui::Separator();
+
+					if (ImGui::Button("Yes", ImVec2(120, 0))) {
+						for (auto& setting : group->settings) {
+							if (setting->type == kSettingType_Checkbox) {
+								if (dynamic_cast<setting_checkbox*>(setting)->control_id != "") {
+									// Remove the control from the control map
+									m_controls.erase(dynamic_cast<setting_checkbox*>(setting)->control_id);
+								}
+							}
+							delete setting;
+						}
+						auto it = std::find(mod->groups.begin(), mod->groups.end(), group);
+						mod->groups.erase(it);
+						mod->json_dirty = true;
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::SetItemDefaultFocus();
+					ImGui::SameLine();
+					if (ImGui::Button("No", ImVec2(120, 0))) {
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::EndPopup();
+				}
 				ImGui::EndPopup();
 			}
 			ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, FLT_MAX));
 
-			ImGui::BeginChild((group->name + "##settings").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysUseWindowPadding);
+			ImGui::BeginChild((group->name + "##settings").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysUseWindowPadding || ImGuiWindowFlags_AlwaysAutoResize);
 			if (edit_mode) {
-				// button to add new setting
-				if (ImGui::Button("+")) {
+				// button to add setting
+				if (ImGui::Button("Add Setting")) {
 					// correct popup position
 					ImGui::SetNextWindowPos(ImGui::GetCursorScreenPos());
 					ImGui::OpenPopup("New_setting");
@@ -387,38 +434,24 @@ void ModSettings::show_modSetting(mod_setting* mod)
 				if (ImGui::BeginPopup("New_setting")) {
 					if (ImGui::Selectable("Checkbox")) {
 						setting_checkbox* checkbox = new setting_checkbox();
-						checkbox->name = "New Checkbox";
-						checkbox->value = false;
 						checkbox->editing = true;
 						group->settings.push_back(checkbox);
 						mod->json_dirty = true;
 					}
 					if (ImGui::Selectable("Slider")) {
 						setting_slider* slider = new setting_slider();
-						slider->name = "New Slider";
-						slider->value = 0.0f;
-						slider->min = 0.0f;
-						slider->max = 1.0f;
-						slider->step = 0.1f;
 						slider->editing = true;
 						group->settings.push_back(slider);
 						mod->json_dirty = true;
 					}
 					if (ImGui::Selectable("Textbox")) {
 						setting_textbox* textbox = new setting_textbox();
-						textbox->name = "New Textbox";
-						textbox->value = "";
 						textbox->editing = true;
 						group->settings.push_back(textbox);
 						mod->json_dirty = true;
 					}
 					if (ImGui::Selectable("Dropdown")) {
 						setting_dropdown* dropdown = new setting_dropdown();
-						dropdown->name = "New Dropdown";
-						dropdown->value = 0;
-						dropdown->options.push_back("Option 1");
-						dropdown->options.push_back("Option 2");
-						dropdown->options.push_back("Option 3");
 						dropdown->editing = true;
 						group->settings.push_back(dropdown);
 						mod->json_dirty = true;
@@ -473,6 +506,26 @@ void ModSettings::show_modSetting(mod_setting* mod)
 					show_setting_author(setting_ptr, mod);
 				} else {
 					show_setting_user(setting_ptr, mod);
+				}
+
+				// delete setting
+				if (edit_mode) {
+					ImGui::SameLine(ImGui::GetContentRegionAvail().x -50);
+					// red button
+					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+					if (ImGui::Button("Delete")) {
+						auto it = std::find(group->settings.begin(), group->settings.end(), setting_ptr);
+						if (it != group->settings.end()) {
+							group->settings.erase(it);
+						}
+						if (setting_ptr->type == setting_type::kSettingType_Checkbox) {
+							setting_checkbox* checkbox = (setting_checkbox*)setting_ptr;
+							m_controls.erase(checkbox->control_id);
+						}
+						delete setting_ptr;
+						mod->json_dirty = true;
+					}
+					ImGui::PopStyleColor();
 				}
 
 				if (!show) {
@@ -905,6 +958,11 @@ void ModSettings::insert_game_setting(mod_setting* mod)
 	}
 }
 
+bool ModSettings::setting_base::incomplete()
+{
+	return this->name.empty() || this->ini_id.empty() || this->ini_section.empty();
+}
+
 void ModSettings::save_all_game_setting()
 {
 	for (auto mod : mods) {
@@ -947,7 +1005,4 @@ extern "C" DLLEXPORT bool RegisterForSettingUpdate(std::string a_mod, std::funct
 	return ModSettings::API_RegisterForSettingUpdate(a_mod, a_callback);
 }
 
-bool ModSettings::setting_base::incomplete()
-{
-	return this->name.empty() || this->ini_id.empty() || this->ini_section.empty();
-}
+

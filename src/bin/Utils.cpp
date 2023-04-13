@@ -1,6 +1,8 @@
 #include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
 #include "imgui_internal.h"
+#include "imgui_stdlib.h"
+
 #include "imgui.h"
 #include "Utils.h"
 namespace Utils
@@ -249,4 +251,20 @@ namespace ImGui
 
 		return ret;
 	}
+
+	bool InputTextRequired(const char* label, std::string* str, ImGuiInputTextFlags flags) 
+	{
+		bool empty = str->empty();
+		if (empty) {
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(1.0f, 0.0f, 0.0f, 0.2f));
+			ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0f, 0.0f, 0.0f, 0.2f));
+			ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 0.0f, 0.0f, 0.2f));
+		}
+		bool ret = ImGui::InputText(label, str, flags);
+		if (empty) {
+			ImGui::PopStyleColor(3);
+		}
+		return ret;
+	}
+
 }

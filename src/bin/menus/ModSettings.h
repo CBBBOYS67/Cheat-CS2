@@ -64,6 +64,9 @@ class ModSettings
 		setting_checkbox()
 		{
 			type = kSettingType_Checkbox;
+			name = "New Checkbox";
+			value = true;
+			default_value = true;
 		}
 		bool value;
 		bool default_value;
@@ -74,11 +77,20 @@ class ModSettings
 	class setting_slider : public setting_base
 	{
 	public:
-		setting_slider() { type = kSettingType_Slider; }
-		float value = 0.0f;
-		float min = 0.0f;
-		float max = 1.0f;
-		float step = 0.01f;
+		setting_slider() 
+		{
+			type = kSettingType_Slider; 
+			name = "New Slider";
+			value = 0.0f;
+			min = 0.0f;
+			max = 1.0f;
+			step = 0.1f;
+			default_value = 0.f;
+		}
+		float value;
+		float min;
+		float max;
+		float step;
 		float default_value;
 		uint8_t precision = 2;  // number of decimal places
 	};
@@ -90,15 +102,27 @@ class ModSettings
 		char* buf;
 		int buf_size;
 		std::string default_value;
-		setting_textbox() { type = kSettingType_Textbox; }
+		setting_textbox() 
+		{ 
+			type = kSettingType_Textbox; 
+			name = "New Textbox";
+			value = "";
+			default_value = "";
+		}
 	};
 
 	class setting_dropdown : public setting_base
 	{
 	public:
-		setting_dropdown() { type = kSettingType_Dropdown; }
+		setting_dropdown() 
+		{ 
+			type = kSettingType_Dropdown; 
+			name = "New Dropdown";
+			value = 0;
+			default_value = 0;
+		}
 		std::vector<std::string> options;
-		int value = 0;  // index into options
+		int value;  // index into options
 		int default_value;
 	};
 
