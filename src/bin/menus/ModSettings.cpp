@@ -100,19 +100,19 @@ void ModSettings::show_saveJsonButton()
 void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mod)
 {
 	ImGui::PushID(setting_ptr);
-	ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, FLT_MAX));
+	//ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, FLT_MAX));
 	//bool incomplete = setting_ptr->incomplete();
 	//if (incomplete) {
 	//	ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Setting configuration incomplete. Please fill in all required fields highlighted in yellow.");
 	//}
-	ImGui::BeginChild((char)setting_ptr, ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
+	//ImGui::BeginChild((char)setting_ptr, ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
 
 
 	// Show input fields to edit the setting name and ini id
 	if (ImGui::InputTextRequired("Name", &setting_ptr->name))
-		mod->dirty = true;
+		mod->json_dirty = true;
 	if (ImGui::InputText("Description", &setting_ptr->desc))
-		mod->dirty = true;
+		mod->json_dirty = true;
 
 	int current_type = setting_ptr->type;
 
@@ -190,6 +190,27 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 	default:
 		break;
 	}
+
+	ImGui::Text("Control");
+	ImGui::BeginChild("##control_requirements", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize);
+	
+	if (ImGui::Button("Add")) {
+		setting_ptr->req.emplace_back();
+		mod->json_dirty = true;
+	}
+	for (int i = 0; i < setting_ptr->req.size(); i++) {
+		ImGui::PushID(i);
+		if (ImGui::InputText("Option", &setting_ptr->req[i]))
+			mod->json_dirty = true;
+		ImGui::SameLine();
+		if (ImGui::Button("-")) {
+			setting_ptr->req.erase(setting_ptr->req.begin() + i);
+			mod->json_dirty = true;
+		}
+		ImGui::PopID();
+	}
+	ImGui::EndChild();
+	
 	
 	ImGui::Text("Serialization");
 	ImGui::BeginChild((setting_ptr->name + "##serialization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
@@ -205,20 +226,20 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 		ImGui::PopStyleColor();
 	}
 
-
 	if (ImGui::InputTextRequired("ini Section", &setting_ptr->ini_section))
 		mod->json_dirty = true;
 
-	if (ImGui::InputTextRequired("Game Setting", &setting_ptr->gameSetting))
+	if (ImGui::InputText("Game Setting", &setting_ptr->gameSetting))
 		mod->json_dirty = true;
 	ImGui::EndChild();
 
-	ImGui::EndChild();
+	//ImGui::EndChild();
 	ImGui::PopID();
 }
 
 void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 {
+	float width = ImGui::GetContentRegionAvail().x * 0.5f;
 	switch (setting_ptr->type) {
 	case kSettingType_Checkbox:
 		{
@@ -240,6 +261,8 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 			setting_slider* slider = dynamic_cast<setting_slider*>(setting_ptr);
 			bool changed = false;
 
+			// Set the width of the slider to a fraction of the available width
+			ImGui::SetNextItemWidth(width);
 			if (ImGui::SliderFloatWithSteps(slider->name.c_str(), &slider->value, slider->min, slider->max, slider->step)) {
 				changed = true;
 			}
@@ -274,6 +297,7 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 		{
 			setting_textbox* textbox = dynamic_cast<setting_textbox*>(setting_ptr);
 
+			ImGui::SetNextItemWidth(width);
 			if (ImGui::InputText(textbox->name.data(), &textbox->value)) {
 				mod->dirty = true;
 			}
@@ -296,7 +320,7 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 			for (auto& option : options) {
 				cstrings.push_back(option.c_str());
 			}
-
+			ImGui::SetNextItemWidth(width);
 			if (ImGui::BeginCombo(name, cstrings[selected])) {
 				for (int i = 0; i < options.size(); i++) {
 					bool is_selected = (selected == i);
@@ -375,7 +399,7 @@ void ModSettings::show_modSetting(mod_setting* mod)
 		}
 
 		// Show collapsing header and child container
-		if (ImGui::CollapsingHeader(group->name.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+		if (ImGui::CollapsingHeader(group->name.c_str())) {
 			// Check if the mod settings are in edit mode and right mouse button is clicked
 			if (edit_mode && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
 				ImGui::OpenPopup("Edit Group");
@@ -423,7 +447,8 @@ void ModSettings::show_modSetting(mod_setting* mod)
 			}
 			ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, FLT_MAX));
 
-			ImGui::BeginChild((group->name + "##settings").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysUseWindowPadding || ImGuiWindowFlags_AlwaysAutoResize);
+			//ImGui::BeginChild((group->name + "##settings").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysUseWindowPadding || ImGuiWindowFlags_AlwaysAutoResize);
+			ImGui::Indent();
 			if (edit_mode) {
 				// button to add setting
 				if (ImGui::Button("Add Setting")) {
@@ -480,7 +505,21 @@ void ModSettings::show_modSetting(mod_setting* mod)
 
 				// Add edit button next to the setting name
 				if (edit_mode) {
-					ImGui::ToggleButton("Edit", &setting_ptr->editing);
+					//ImGui::ToggleButton("Edit", &setting_ptr->editing);
+					if (ImGui::Button("Edit")) {  // Get the size of the current window
+						
+						ImGui::OpenPopup("Edit Setting");
+						ImVec2 windowSize = ImGui::GetWindowSize();
+						// Set the size of the pop-up to be proportional to the window size
+						ImVec2 popupSize(windowSize.x * 0.5f, windowSize.y * 0.5f);
+						ImGui::SetNextWindowSize(popupSize);
+					}
+					if (ImGui::BeginPopup("Edit Setting")) {
+						// Get the size of the current window
+						show_setting_author(setting_ptr, mod);
+						ImGui::EndPopup();
+					}
+					
 					// up/down the mod
 					ImGui::SameLine();
 					if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
@@ -501,12 +540,13 @@ void ModSettings::show_modSetting(mod_setting* mod)
 					ImGui::SameLine();
 				}
 				
-				// Show the setting name and value
-				if (setting_ptr->editing) {
-					show_setting_author(setting_ptr, mod);
-				} else {
-					show_setting_user(setting_ptr, mod);
-				}
+				//// Show the setting name and value
+				//if (setting_ptr->editing) {
+				//	show_setting_author(setting_ptr, mod);
+				//} else {
+				//	show_setting_user(setting_ptr, mod);
+				//}
+				show_setting_user(setting_ptr, mod);
 
 				// delete setting
 				if (edit_mode) {
@@ -535,8 +575,8 @@ void ModSettings::show_modSetting(mod_setting* mod)
 				}
 				ImGui::PopID();
 			}
-
-			ImGui::EndChild();
+			ImGui::Unindent();
+			//ImGui::EndChild();
 		}
 
 		// Restore original header color
