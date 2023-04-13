@@ -23,7 +23,7 @@ namespace ini
 		loader.save(Settings::lockWindowPos, "lockWindowPos");
 
 		loader.setActiveSection("Localization");
-		uint32_t lan = static_cast<uint32_t>(Settings::language);
+		uint32_t lan = static_cast<uint32_t>(Translator::Language);
 		loader.save(lan, "language");
 
 		loader.flush();
@@ -43,7 +43,7 @@ namespace ini
 		loader.setActiveSection("Localization");
 		uint32_t lan;
 		loader.load(lan, "language");
-		Settings::language = static_cast<Settings::Language>(lan);
+		Translator::Language = static_cast<Translator::Language>(lan);
 	}
 
 	void init()
@@ -93,11 +93,20 @@ namespace UI
 
 namespace Localization
 {
-
-	std::vector<std::pair<Settings::Language, std::string>> _languages = {
-		{ Settings::Language::English, "English" },
-		{ Settings::Language::ChineseSimplified, "Simplified Chinese" },
-		{ Settings::Language::ChineseTraditional, "Traditional Chinese" }
+	std::vector<std::pair<Translator::Language, std::string>> _languages = {
+		{Translator::Language::English, "English"},
+		{Translator::Language::German, "German"},
+		{Translator::Language::French, "French"},
+		{Translator::Language::Spanish, "Spanish"},
+		{Translator::Language::Italian, "Italian"},
+		{Translator::Language::Russian, "Russian"},
+		{Translator::Language::Polish, "Polish"},
+		{Translator::Language::Portuguese, "Portuguese"},
+		{Translator::Language::Japanese, "Japanese"},
+		{Translator::Language::Chinese, "Chinese"},
+		{Translator::Language::Korean, "Korean"},
+		{Translator::Language::Turkish, "Turkish"},
+		{Translator::Language::Arabic, "Arabic"},
 	};
 	void init()
 	{
@@ -105,11 +114,11 @@ namespace Localization
 
 	void show()
 	{
-		if (ImGui::BeginCombo("Language", _languages[(int)Settings::language].second.c_str())) {
+		if (ImGui::BeginCombo("Language", _languages[(int)Translator::Language].second.c_str())) {
 			for (int i = 0; i < _languages.size(); i++) {
-				bool isSelected = ((int)Settings::language == i);
+				bool isSelected = ((int)Translator::Language == i);
 				if (ImGui::Selectable(_languages[i].second.c_str(), isSelected)) {
-					Settings::language = static_cast<Settings::Language>(i);
+					Translator::Language = static_cast<Translator::Language>(i);
 				}
 			}
 			ImGui::EndCombo();

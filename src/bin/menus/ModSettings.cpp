@@ -14,26 +14,6 @@
 
 using json = nlohmann::json;
 
-// Initialize static members
-std::vector<ModSettings::mod_setting*> ModSettings::mods;
-
-std::unordered_map<std::string_view, std::string, ModSettings::Translations::StringHash> ModSettings::Translations::translation_EN;
-std::unordered_map<std::string_view, std::string, ModSettings::Translations::StringHash> ModSettings::Translations::translation_FR;
-std::unordered_map<std::string_view, std::string, ModSettings::Translations::StringHash> ModSettings::Translations::translation_CN;
-std::unordered_map<std::string_view, std::string, ModSettings::Translations::StringHash> ModSettings::Translations::translation_RU;
-
-void ModSettings::Translations::init()
-{
-	// Load translations from files here
-	// ...
-}
-
-std::string_view ModSettings::Translations::lookup(std::string_view a_key)
-{
-	// Lookup key in selected translation map and return value
-	// ...
-	return a_key;
-}
 // not used anymore, we auto save.
 void ModSettings::show_saveButton()
 {

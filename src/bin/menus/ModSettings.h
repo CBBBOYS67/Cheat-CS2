@@ -3,30 +3,6 @@
 
 class ModSettings
 {
-	class Translations
-	{
-		struct StringHash
-		{
-			std::size_t operator()(std::string_view str) const
-			{
-				std::size_t hash = 0;
-				for (char c : str) {
-					hash = (hash * 31) + c;
-				}
-				return hash;
-			}
-		};
-		static std::unordered_map<std::string_view, std::string, StringHash> translation_EN;
-		static std::unordered_map<std::string_view, std::string, StringHash> translation_FR;
-		static std::unordered_map<std::string_view, std::string, StringHash> translation_CN;
-		static std::unordered_map<std::string_view, std::string, StringHash> translation_RU;
-
-		public:
-		static void init();
-		static std::string_view lookup(std::string_view a_key);
-	};
-
-	
 	enum setting_type
 	{
 		kSettingType_Checkbox,
@@ -147,9 +123,7 @@ class ModSettings
 	};
 
 	/* Settings of all mods*/
-	static std::vector<mod_setting*> mods;
-
-	static std::vector<mod_setting*> mods_dirty;  // mods that need to be serialized back to disk
+	static inline std::vector<mod_setting*> mods;
 
 public:
 
@@ -178,12 +152,12 @@ public:
 	static bool API_RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback);
 
 private:
-	// for show()
 	static void show_saveButton();
 	static void show_saveJsonButton();
 	static void show_modSetting(mod_setting* mod);
 	static void show_setting_author(setting_base* base, mod_setting* mod);
 	static void show_setting_user(setting_base* base, mod_setting* mod);
+
 	static inline std::unordered_map<std::string, setting_checkbox*> m_controls;
 
 	static inline bool edit_mode = false;
