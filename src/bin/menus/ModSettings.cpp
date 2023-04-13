@@ -101,12 +101,6 @@ void ModSettings::show_saveJsonButton()
 void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mod)
 {
 	ImGui::PushID(setting_ptr);
-	//ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, FLT_MAX));
-	//bool incomplete = setting_ptr->incomplete();
-	//if (incomplete) {
-	//	ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Setting configuration incomplete. Please fill in all required fields highlighted in yellow.");
-	//}
-	//ImGui::BeginChild((char)setting_ptr, ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
 
 
 	// Show input fields to edit the setting name and ini id
@@ -216,22 +210,27 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 	ImGui::Text("Serialization");
 	ImGui::BeginChild((setting_ptr->name + "##serialization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
 	
-	bool incomplete_ini_id = setting_ptr->ini_id.empty() || false;
-	if (incomplete_ini_id) {
-		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
-	}
-	if (ImGui::InputText("ini ID", &setting_ptr->ini_id))
+	if (ImGui::InputTextRequired("ini ID", &setting_ptr->ini_id))
 		mod->json_dirty = true;
 	
-	if (incomplete_ini_id) {
-		ImGui::PopStyleColor();
-	}
-
 	if (ImGui::InputTextRequired("ini Section", &setting_ptr->ini_section))
 		mod->json_dirty = true;
 
 	if (ImGui::InputText("Game Setting", &setting_ptr->gameSetting)) {
 		mod->json_dirty = true;
+	}
+	if (setting_ptr->type == kSettingType_Slider) {
+		if (!setting_ptr->gameSetting.empty()) {
+			switch (setting_ptr->gameSetting[0]) {
+				case "f":
+				case "i":
+				case "u":
+					break;
+				default:
+					ImGui::TextColored(ImVec4(1, 0, 0, 1), "For sliders, game setting must start with f, i, or u for float, int, or uint respectively for type specification.");
+					break;
+			}
+		}
 	}
 	ImGui::EndChild();
 
@@ -542,12 +541,6 @@ void ModSettings::show_modSetting(mod_setting* mod)
 					ImGui::SameLine();
 				}
 				
-				//// Show the setting name and value
-				//if (setting_ptr->editing) {
-				//	show_setting_author(setting_ptr, mod);
-				//} else {
-				//	show_setting_user(setting_ptr, mod);
-				//}
 				show_setting_user(setting_ptr, mod);
 
 				// delete setting
@@ -609,9 +602,7 @@ void ModSettings::show()
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 	for (auto& mod : mods) {
 		if (ImGui::CollapsingHeader(mod->name.c_str())) {
-			//ImGui::BeginChild((mod->name + "##settings").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_NoScrollbar);
 			show_modSetting(mod);
-			//ImGui::EndChild();
 		}
 	}
 	ImGui::PopStyleColor();
