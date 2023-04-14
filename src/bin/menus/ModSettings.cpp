@@ -210,7 +210,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 	
 	
 	ImGui::Text("Localization");
-	if (ImGui::BeginChild((std::string(entry->name.get()) + "##Localization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize)) {
+	if (ImGui::BeginChild((std::string(entry->name.def) + "##Localization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize)) {
 		if (ImGui::InputText("Name", &entry->name.key, ImGuiInputTextFlags_AutoSelectAll))
 			mod->json_dirty = true;
 		if (ImGui::InputText("Description", &entry->desc.key, ImGuiInputTextFlags_AutoSelectAll))
@@ -221,7 +221,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 	if (entry->is_setting()) {
 		setting_base* setting = dynamic_cast<setting_base*>(entry);
 		ImGui::Text("Serialization");
-		if (ImGui::BeginChild((std::string(setting->name.get()) + "##serialization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize)) {
+		if (ImGui::BeginChild((std::string(setting->name.def) + "##serialization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize)) {
 			if (ImGui::InputTextRequired("ini ID", &setting->ini_id))
 				mod->json_dirty = true;
 
@@ -639,6 +639,26 @@ void ModSettings::show_modSetting(mod_setting* mod)
 
 
 
+inline std::string ModSettings::getEntryStr(entry_type t)
+{
+	switch (t) {
+	case entry_type::kEntryType_Checkbox:
+		return "checkbox";
+	case entry_type::kEntryType_Slider:
+		return "slider";
+	case entry_type::kEntryType_Textbox:
+		return "textbox";
+	case entry_type::kEntryType_Dropdown:
+		return "dropdown";
+	case entry_type::kEntryType_Text:
+		return "text";
+	case entry_type::kEntryType_Group:
+		return "group";
+	default:
+		return "invalid";
+	}
+}
+
 void ModSettings::show()
 {
 	show_saveButton();
@@ -825,6 +845,75 @@ void ModSettings::load_json(std::filesystem::path path)
 	INFO("Loaded mod {}", mod->name);
 }
 
+void ModSettings::populate_non_group_json(Entry* entry, nlohmann::json& json)
+{
+	std::string type_str = "";
+	if (!entry->is_setting()) {
+		if (entry->type == entry_type::kEntryType_Text) {
+			type_str = "text";
+			json["style"]["color"]["r"] = dynamic_cast<Entry_text*>(entry)->_color.x;
+			json["style"]["color"]["g"] = dynamic_cast<Entry_text*>(entry)->_color.y;
+			json["style"]["color"]["b"] = dynamic_cast<Entry_text*>(entry)->_color.z;
+			json["style"]["color"]["a"] = dynamic_cast<Entry_text*>(entry)->_color.w;
+		}
+	}
+	
+	setting_base* setting = dynamic_cast<setting_base*>(entry);
+	json["ini"]["section"] = setting->ini_section;
+	json["ini"]["id"] = setting->ini_id;
+	if (setting->gameSetting != "") {
+		json["gameSetting"] = dynamic_cast<setting_base*>(entry)->gameSetting;
+	}
+	if (setting->type == entry_type::kEntryType_Checkbox) {
+		auto cb_setting = dynamic_cast<setting_checkbox*>(entry);
+		json["default"] = cb_setting->default_value;
+		if (cb_setting->control_id != "") {
+			json["control"]["id"] = cb_setting->control_id;
+		}
+		type_str = "checkbox";
+	} else if (setting->type == entry_type::kEntryType_Slider) {
+		auto slider_setting = dynamic_cast<setting_slider*>(entry);
+		json["default"] = slider_setting->default_value;
+		json["style"]["min"] = slider_setting->min;
+		json["style"]["max"] = slider_setting->max;
+		json["style"]["step"] = slider_setting->step;
+		type_str = "slider";
+
+	} else if (setting->type == entry_type::kEntryType_Textbox) {
+		auto textbox_setting = dynamic_cast<setting_textbox*>(entry);
+		json["default"] = textbox_setting->default_value;
+		json["size"] = textbox_setting->buf_size;
+		type_str = "textbox";
+
+	} else if (setting->type == entry_type::kEntryType_Dropdown) {
+		auto dropdown_setting = dynamic_cast<setting_dropdown*>(entry);
+		json["default"] = dropdown_setting->default_value;
+		for (auto& option : dropdown_setting->options) {
+			json["options"].push_back(option);
+		}
+		type_str = "dropdown";
+	}
+	
+}
+
+
+void ModSettings::populate_group_json(Entry_group* group, nlohmann::json& json)
+{
+	json["type"] = "group";
+	for (auto& entry : group->entries) {
+		nlohmann::json entry_json;
+		entry_json["text"]["name"] = entry->name.def;
+		entry_json["text"]["desc"] = entry->desc.def;
+		entry_json["translation"]["name"] = entry->name.key;
+		entry_json["translation"]["desc"] = entry->desc.key;
+		if (entry->is_group()) {
+			populate_group_json(dynamic_cast<Entry_group*>(entry), entry_json);
+		} else {
+			populate_non_group_json(entry, entry_json);
+		}
+		json["entries"].push_back(entry_json);
+	}
+}
 /* Serialize config to .json*/
 void ModSettings::save_mod_config(mod_setting* mod)
 {
@@ -832,84 +921,23 @@ void ModSettings::save_mod_config(mod_setting* mod)
 	mod_json["name"] = mod->name;
 	mod_json["ini"] = mod->ini_path;
 
-	for (auto& group : mod->groups) {
-		nlohmann::json group_json;
-		group_json["group"] = group->name.def;
-		group_json["desc"] = group->desc.def;
-		group_json["translation"]["name"] = group->name.key;
-		group_json["translation"]["desc"] = group->desc.key;
+	nlohmann::json data_json;
 
-		for (auto& entry : group->entries) {
-			nlohmann::json setting_json;
+	for (auto& entry : mod->entries) {
+		nlohmann:json entry_json;
+		entry_json["text"]["name"] = entry->name.def;
+		entry_json["text"]["desc"] = entry->desc.def;
+		entry_json["translation"]["name"] = entry->name.key;
+		entry_json["translation"]["desc"] = entry->desc.key;
 
-			setting_json["text"]["name"] = entry->name.def;
-			setting_json["text"]["desc"] = entry->desc.def;
-			setting_json["translation"]["name"] = entry->name.key;
-			setting_json["translation"]["desc"] = entry->desc.key;
-
-			std::string type_str = "";
-			if (entry->is_setting()) {
-				setting_json["ini"]["section"] = dynamic_cast<setting_base*>(entry)->ini_section;
-				setting_json["ini"]["id"] = dynamic_cast<setting_base*>(entry)->ini_id;
-				if (dynamic_cast<setting_base*>(entry)->gameSetting != "") {
-					setting_json["gameSetting"] = dynamic_cast<setting_base*>(entry)->gameSetting;
-				}
-				if (entry->type == entry_type::kEntryType_Checkbox) {
-					auto cb_setting = dynamic_cast<setting_checkbox*>(entry);
-					setting_json["default"] = cb_setting->default_value;
-					if (cb_setting->control_id != "") {
-						setting_json["control"]["id"] = cb_setting->control_id;
-					}
-					type_str = "checkbox";
-				} else if (entry->type == entry_type::kEntryType_Slider) {
-					auto slider_setting = dynamic_cast<setting_slider*>(entry);
-					setting_json["default"] = slider_setting->default_value;
-					setting_json["style"]["min"] = slider_setting->min;
-					setting_json["style"]["max"] = slider_setting->max;
-					setting_json["style"]["step"] = slider_setting->step;
-					type_str = "slider";
-
-				} else if (entry->type == entry_type::kEntryType_Textbox) {
-					auto textbox_setting = dynamic_cast<setting_textbox*>(entry);
-					setting_json["default"] = textbox_setting->default_value;
-					setting_json["size"] = textbox_setting->buf_size;
-					type_str = "textbox";
-
-				} else if (entry->type == entry_type::kEntryType_Dropdown) {
-					auto dropdown_setting = dynamic_cast<setting_dropdown*>(entry);
-					setting_json["default"] = dropdown_setting->default_value;
-					for (auto& option : dropdown_setting->options) {
-						setting_json["options"].push_back(option);
-					}
-					type_str = "dropdown";
-				}
-			} else {
-				if (entry->type == entry_type::kEntryType_Text) {
-					type_str = "text";
-					setting_json["style"]["color"]["r"] = dynamic_cast<Entry_text*>(entry)->_color.x;
-					setting_json["style"]["color"]["g"] = dynamic_cast<Entry_text*>(entry)->_color.y;
-					setting_json["style"]["color"]["b"] = dynamic_cast<Entry_text*>(entry)->_color.z;
-					setting_json["style"]["color"]["a"] = dynamic_cast<Entry_text*>(entry)->_color.w;
-				}
-			}
-
-			if (type_str.empty()) {
-				ERROR("Unknown entry type for {} in {}", entry->name.def, mod->name);
-			}
-
-			setting_json["type"] = type_str;
-
-			if (!entry->req.empty()) {
-				for (auto& r : entry->req) {
-					setting_json["control"]["need"].push_back(r);
-				}
-			}
-
-			group_json["settings"].push_back(setting_json);
-
+		if (entry->is_group()) {
+			populate_group_json(dynamic_cast<Entry_group*>(entry), entry_json);
+		} else {
+			populate_non_group_json(entry, entry_json);
 		}
-		mod_json["Groups"].push_back(group_json);
+		data_json.push_back(entry_json);
 	}
+	
 	
 	std::ofstream json_file(mod->json_path);
 	if (!json_file.is_open()) {
@@ -917,6 +945,8 @@ void ModSettings::save_mod_config(mod_setting* mod)
 		INFO("error: failed to open {}", mod->json_path);
 		return;
 	}
+	
+	mod_json["data"] = data_json;
 
 	try {
 		json_file << mod_json;
@@ -943,157 +973,210 @@ void ModSettings::load_ini(mod_setting* mod)
 	if (rc != SI_OK) {
 		// Handle error loading file
 		INFO(".ini file for {} not found. Creating a new .ini file.", mod->name);
-		construct_ini(mod);
+		save_ini(mod);
 		return;
 	}
-
-	// Iterate through each group in the mod
-	for (auto& group : mod->groups) {
-		// Iterate through each setting in the group
-		for (auto& entry : group->entries) {
-			if (!entry->is_setting()) {
-				continue;
-			}
-			auto setting_ptr = dynamic_cast<setting_base*>(entry);
-			if (setting_ptr->ini_id.empty() || setting_ptr->ini_section.empty()) {
-				ERROR("Undefined .ini serialization for setting {}; failed to load value.", setting_ptr->name.def);
-				continue;
-			}
-			// Get the value of this setting from the ini file
-			std::string value;
-			if (ini.KeyExists(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str())) {
-				value = ini.GetValue(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str(), "");
-			} else {
-				INFO(".ini file for {} has no value for {}. Creating a new .ini file.", mod->name, setting_ptr->name.get());
-				construct_ini(mod);
-				return;
-			}
-			// Convert the value to the appropriate type and assign it to the setting
-			if (setting_ptr->type == kEntryType_Checkbox) {
-				dynamic_cast<setting_checkbox*>(setting_ptr)->value = (value == "true");
-			} else if (setting_ptr->type == kEntryType_Slider) {
-				dynamic_cast<setting_slider*>(setting_ptr)->value = std::stof(value);
-			} else if (setting_ptr->type == kEntryType_Textbox) {
-				dynamic_cast<setting_textbox*>(setting_ptr)->value = value;
-			} else if (setting_ptr->type == kEntryType_Dropdown) {
-				dynamic_cast<setting_dropdown*>(setting_ptr)->value = std::stoi(value);
-			}
-		}
-	}
-}
-
-void ModSettings::construct_ini(mod_setting* mod)
-{
 
 	// Create a SimpleIni object to write to the ini file
 	CSimpleIniA ini;
 	ini.SetUnicode();
 
-	// Iterate through each group in the mod
-	for (auto& group : mod->groups) {
-		// Iterate through each setting in the group
-		for (auto& entry : group->entries) {
-			if (!entry->is_setting()) {
-				continue;
-			}
-			auto setting_ptr = dynamic_cast<setting_base*>(entry);
-			// Write the default value of this setting to the ini file
-			if (setting_ptr->type == kEntryType_Checkbox) {
-				ini.SetValue(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str(), dynamic_cast<setting_checkbox*>(setting_ptr)->value == true ? "true" : "false");
-			} else if (setting_ptr->type == kEntryType_Slider) {
-				ini.SetValue(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str(), std::to_string(dynamic_cast<setting_slider*>(setting_ptr)->value).c_str());
-			} else if (setting_ptr->type == kEntryType_Textbox) {
-				ini.SetValue(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str(), dynamic_cast<setting_textbox*>(setting_ptr)->value.c_str());
-			} else if (setting_ptr->type == kEntryType_Dropdown) {
-				ini.SetValue(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str(), std::to_string(dynamic_cast<setting_dropdown*>(setting_ptr)->value).c_str());
-			}
+	std::stack<Entry_group*> group_stack;
+	std::stack<setting_base*> setting_stack;
+	for (auto& entry : mod->entries) {
+		if (entry->is_group()) {
+			group_stack.push(dynamic_cast<Entry_group*>(entry));
+		} else if (entry->is_setting()) {
+			setting_stack.push(dynamic_cast<setting_base*>(entry));
 		}
 	}
 
-	// Save the ini file
-	ini.SaveFile(mod->ini_path.c_str());
+	while (!group_stack.empty()) {  // get all groups
+		auto group = group_stack.top();
+		group_stack.pop();
+		for (auto& entry : group->entries) {
+			if (entry->is_group()) {
+				group_stack.push(dynamic_cast<Entry_group*>(entry));
+			} else if (entry->is_setting()) {
+				setting_stack.push(dynamic_cast<setting_base*>(entry));
+			}
+		}
+	}
+	
+
+	// Iterate through each setting in the group
+	while (!setting_stack.empty()) {
+		auto setting_ptr = setting_stack.top();
+		setting_stack.pop();
+		if (setting_ptr->ini_id.empty() || setting_ptr->ini_section.empty()) {
+			ERROR("Undefined .ini serialization for setting {}; failed to load value.", setting_ptr->name.def);
+			continue;
+		}
+		// Get the value of this setting from the ini file
+		std::string value;
+		if (ini.KeyExists(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str())) {
+			value = ini.GetValue(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str(), "");
+		} else {
+			INFO(".ini file for {} has no value for {}. Creating a new .ini file.", mod->name, setting_ptr->name.get());
+			save_ini(mod);
+			return;
+		}
+		// Convert the value to the appropriate type and assign it to the setting
+		if (setting_ptr->type == kEntryType_Checkbox) {
+			dynamic_cast<setting_checkbox*>(setting_ptr)->value = (value == "true");
+		} else if (setting_ptr->type == kEntryType_Slider) {
+			dynamic_cast<setting_slider*>(setting_ptr)->value = std::stof(value);
+		} else if (setting_ptr->type == kEntryType_Textbox) {
+			dynamic_cast<setting_textbox*>(setting_ptr)->value = value;
+		} else if (setting_ptr->type == kEntryType_Dropdown) {
+			dynamic_cast<setting_dropdown*>(setting_ptr)->value = std::stoi(value);
+		}
+	}
 }
 
-/* Flush changes to MOD into its .ini file. .ini file is guaranteed to exist.*/
+
+
+/* Flush changes to MOD into its .ini file*/
 void ModSettings::save_ini(mod_setting* mod)
 {
 	// Create a SimpleIni object to write to the ini file
 	CSimpleIniA ini;
 	ini.SetUnicode();
 
-	// Iterate through each group in the mod
-	for (auto& group : mod->groups) {
-		// Iterate through each setting in the group
+	std::stack<Entry_group*> group_stack;
+	std::stack<setting_base*> setting_stack;
+	for (auto& entry : mod->entries) {
+		if (entry->is_group()) {
+			group_stack.push(dynamic_cast<Entry_group*>(entry));
+		} else if (entry->is_setting()) {
+			setting_stack.push(dynamic_cast<setting_base*>(entry));
+		}
+	}
+
+	while (!group_stack.empty()) {  // get all groups
+		auto group = group_stack.top();
+		group_stack.pop();
 		for (auto& entry : group->entries) {
-			if (!entry->is_setting()) {
-				continue;
-			}
-			auto setting = dynamic_cast<setting_base*>(entry);
-			// Write the current value of this setting to the ini file
-			if (setting->type == kEntryType_Checkbox) {
-				ini.SetValue(setting->ini_section.c_str(), setting->ini_id.c_str(), dynamic_cast<setting_checkbox*>(setting)->value == true ? "true" : "false");
-			} else if (setting->type == kEntryType_Slider) {
-				ini.SetValue(setting->ini_section.c_str(), setting->ini_id.c_str(), std::to_string(dynamic_cast<setting_slider*>(setting)->value).c_str());
-			} else if (setting->type == kEntryType_Textbox) {
-				ini.SetValue(setting->ini_section.c_str(), setting->ini_id.c_str(), dynamic_cast<setting_textbox*>(setting)->value.c_str());
-			} else if (setting->type == kEntryType_Dropdown) {
-				ini.SetValue(setting->ini_section.c_str(), setting->ini_id.c_str(), std::to_string(dynamic_cast<setting_dropdown*>(setting)->value).c_str());
+			if (entry->is_group()) {
+				group_stack.push(dynamic_cast<Entry_group*>(entry));
+			} else if (entry->is_setting()) {
+				setting_stack.push(dynamic_cast<setting_base*>(entry));
 			}
 		}
+	}
+
+	while (!setting_stack.empty()) {
+		auto setting = setting_stack.top();
+		setting_stack.pop();
+		if (setting->ini_id.empty() || setting->ini_section.empty()) {
+			ERROR("Undefined .ini serialization for setting {}; failed to save value.", setting->name.def);
+			continue;
+		}
+		// Get the value of this setting from the ini file
+		std::string value;
+		if (setting->type == kEntryType_Checkbox) {
+			value = dynamic_cast<setting_checkbox*>(setting)->value ? "true" : "false";
+		} else if (setting->type == kEntryType_Slider) {
+			value = std::to_string(dynamic_cast<setting_slider*>(setting)->value);
+		} else if (setting->type == kEntryType_Textbox) {
+			value = dynamic_cast<setting_textbox*>(setting)->value;
+		} else if (setting->type == kEntryType_Dropdown) {
+			value = std::to_string(dynamic_cast<setting_dropdown*>(setting)->value);
+		}
+		ini.SetValue(setting->ini_section.c_str(), setting->ini_id.c_str(), value.c_str());
 	}
 
 	// Save the ini file
 	ini.SaveFile(mod->ini_path.c_str());
 }
 
-/* Flush changes to MOD's settings to game settings.*/
-void ModSettings::save_game_setting(mod_setting* mod)
+void ModSettings::save_game_setting(setting_base* setting)
 {
 	auto gsc = RE::GameSettingCollection::GetSingleton();
 	if (!gsc) {
 		ERROR("Game setting collection not found when trying to save game setting.");
 		return;
 	}
-	// Iterate through each group in the mod
-	for (auto& group : mod->groups) {
-		// Iterate through each setting in the group
-		for (auto& entry : group->entries) {
-			if (!entry->is_setting()) {
-				continue;
-			}
-			setting_base* setting = dynamic_cast<setting_base*>(entry);
-			if (setting->gameSetting.empty()) { // no gamesetting mapping
-				continue;
-			}
-			RE::Setting* s = gsc->GetSetting(setting->gameSetting.data());
-			if (!s) {
-				ERROR("Game setting not found when trying to save game setting.");
-			}
-			// Write the current value of this setting to the ini file
-			if (setting->type == kEntryType_Checkbox) {
-				s->SetBool(dynamic_cast<setting_checkbox*>(setting)->value);
-			} else if (setting->type == kEntryType_Slider) {
-				float val = dynamic_cast<setting_slider*>(setting)->value;
-				switch (s->GetType()) {
-				case RE::Setting::Type::kUnsignedInteger:
-					s->SetUnsignedInteger((uint32_t)val);
-					break;
-				case RE::Setting::Type::kInteger:
-					s->SetInteger(static_cast<std::int32_t>(val));
-					break;
-				case RE::Setting::Type::kFloat:
-					s->SetFloat(val);
-					break;
-				default:
-					ERROR("Game setting variable for slider has bad type prefix. Prefix it with f(float), i(integer), or u(unsigned integer) to specify the game setting type.");
-					break;
-				}
-			} else if (setting->type == kEntryType_Textbox) {
-				s->SetString(dynamic_cast<setting_textbox*>(setting)->value.c_str());
-			} else if (setting->type == kEntryType_Dropdown) {
-				//s->SetUnsignedInteger(dynamic_cast<setting_dropdown*>(setting_ptr)->value);
-				s->SetInteger(dynamic_cast<setting_dropdown*>(setting)->value);
-			}
+	RE::Setting* s = gsc->GetSetting(setting->gameSetting.data());
+	if (!s) {
+		ERROR("Game setting not found when trying to save game setting.");
+	}
+	if (setting->type == kEntryType_Checkbox) {
+		s->SetBool(dynamic_cast<setting_checkbox*>(setting)->value);
+	} else if (setting->type == kEntryType_Slider) {
+		float val = dynamic_cast<setting_slider*>(setting)->value;
+		switch (s->GetType()) {
+		case RE::Setting::Type::kUnsignedInteger:
+			s->SetUnsignedInteger((uint32_t)val);
+			break;
+		case RE::Setting::Type::kInteger:
+			s->SetInteger(static_cast<std::int32_t>(val));
+			break;
+		case RE::Setting::Type::kFloat:
+			s->SetFloat(val);
+			break;
+		default:
+			ERROR("Game setting variable for slider has bad type prefix. Prefix it with f(float), i(integer), or u(unsigned integer) to specify the game setting type.");
+			break;
+		}
+	} else if (setting->type == kEntryType_Textbox) {
+		s->SetString(dynamic_cast<setting_textbox*>(setting)->value.c_str());
+	} else if (setting->type == kEntryType_Dropdown) {
+		//s->SetUnsignedInteger(dynamic_cast<setting_dropdown*>(setting_ptr)->value);
+		s->SetInteger(dynamic_cast<setting_dropdown*>(setting)->value);
+	}
+}
+
+void ModSettings::save_game_setting(Entry_group* group)
+{
+	for (auto& setting : group->entries) {
+		if (setting->is_group()) {
+			save_game_setting(dynamic_cast<Entry_group*>(setting));
+		} else if (setting->is_setting()) {
+			save_game_setting(dynamic_cast<setting_base*>(setting));
+		}
+	}
+}
+
+/* Flush changes to MOD's settings to game settings.*/
+void ModSettings::save_game_setting(mod_setting* mod)
+{
+	for (auto& entry : mod->entries) {
+		if (entry->is_group()) {
+			save_game_setting(dynamic_cast<Entry_group*>(entry));
+		} else if (entry->is_setting()) {
+			save_game_setting(dynamic_cast<setting_base*>(entry));
+		}
+	}
+}
+
+void ModSettings::insert_game_setting(setting_base* setting)
+{
+	if (setting->gameSetting.empty()) {  // no gamesetting mapping
+		return;
+	}
+	auto gsc = RE::GameSettingCollection::GetSingleton();
+	if (gsc->GetSetting(setting->gameSetting.data())) {  // setting already exists
+		return;
+	}
+	RE::Setting* s = new RE::Setting(setting->gameSetting.c_str());
+	if (!s) {
+		ERROR("Failed to initialize setting when trying to insert game setting.");
+	}
+	gsc->InsertSetting(s);
+	if (!gsc->GetSetting(setting->gameSetting.c_str())) {
+		ERROR("Failed to insert game setting.");
+	}
+}
+
+void ModSettings::insert_game_setting(Entry_group* group)
+{
+	// Iterate through each setting in the group
+	for (auto& entry : group->entries) {
+		if (entry->is_group()) {
+			insert_game_setting(dynamic_cast<Entry_group*>(entry));
+		} else if (entry->is_setting()) {
+			insert_game_setting(dynamic_cast<setting_base*>(entry));
 		}
 	}
 }
@@ -1101,35 +1184,13 @@ void ModSettings::save_game_setting(mod_setting* mod)
 
 void ModSettings::insert_game_setting(mod_setting* mod) 
 {
-	auto gsc = RE::GameSettingCollection::GetSingleton();
-	if (!gsc) {
-		ERROR("Game setting collection not found when trying to initialize game setting.");
-		return;
-	}
-	// Iterate through each group in the mod
-	for (auto& group : mod->groups) {
-		// Iterate through each setting in the group
-		for (auto& entry : group->entries) {
-			if (!entry->is_setting()) {
-				continue;
-			}
-			setting_base* setting = dynamic_cast<setting_base*>(entry);
-			if (setting->gameSetting.empty()) {  // no gamesetting mapping
-				continue;
-			}
-			if (gsc->GetSetting(setting->gameSetting.data())) {  // setting already exists
-				continue;
-			}
-			RE::Setting* s = new RE::Setting(setting->gameSetting.c_str());
-			if (!s) {
-				ERROR("Failed to initialize setting when trying to insert game setting.");
-			}
-			gsc->InsertSetting(s);
-			if (!gsc->GetSetting(setting->gameSetting.c_str())) {
-				ERROR("Failed to insert game setting.");
-			}
+	for (auto& entry : mod->entries) {
+		if (entry->is_group()) {
+			insert_game_setting(dynamic_cast<Entry_group*>(entry));
+		} else if (entry->is_setting()) {
+			insert_game_setting(dynamic_cast<setting_base*>(entry));
 		}
-	}
+	}	
 }
 
 void ModSettings::save_all_game_setting()

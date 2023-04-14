@@ -11,8 +11,11 @@ class ModSettings
 		kEntryType_Textbox,
 		kEntryType_Dropdown,
 		kEntryType_Text,
+		kEntryType_Group,
 		kSettingType_Invalid
 	};
+
+	static std::string getEntryStr(entry_type t);
 
 	class Entry
 	{
@@ -24,16 +27,12 @@ class ModSettings
 		bool editing = false;
 		virtual bool is_setting() const { return false; }
 		virtual ~Entry() = default;
-		Entry() 
-		{
-			type = kSettingType_Invalid;
-		}
+		virtual bool is_group() const { return false; }
 	};
 
 	class Entry_text : public Entry
 	{
 	public:
-		std::string stuff;
 		ImVec4 _color;
 
 		Entry_text()
@@ -41,6 +40,20 @@ class ModSettings
 			type = kEntryType_Text;
 			name = Translatable("New Text");
 			_color = ImVec4(1, 1, 1, 1);
+		}
+		bool is_group() const override { return true; }
+	};
+
+
+	class Entry_group : public Entry
+	{
+	public:
+		std::vector<Entry*> entries;
+		
+		Entry_group()
+		{
+			type = kEntryType_Group;
+			name = Translatable("New Group");
 		}
 	};
 
@@ -130,15 +143,8 @@ class ModSettings
 	class mod_setting
 	{
 	public:
-		class mod_setting_group
-		{
-		public:
-			Translatable name;
-			Translatable desc;
-			std::vector<Entry*> entries;
-		};
 		std::string name;
-		std::vector<mod_setting_group*> groups;
+		std::vector<Entry*> entries;
 		bool dirty;
 		bool json_dirty;
 		std::string ini_path;
@@ -160,13 +166,20 @@ public:
 	private:
 	/* Load a single mod from .json file*/
 	static void load_json(std::filesystem::path a_path);
+	
+	static void populate_non_group_json(Entry* group, nlohmann::json& group_json);
+	static void populate_group_json(Entry_group* group, nlohmann::json& group_json);
 	static void save_mod_config(mod_setting* mod);
+	
 	static void load_ini(mod_setting* mod);
-	static void construct_ini(mod_setting* mod);
 	static void save_ini(mod_setting* mod);
-
+	
+	static void save_game_setting(setting_base* mod);
+	static void save_game_setting(Entry_group* mod);
 	static void save_game_setting(mod_setting* mod);
 
+	static void insert_game_setting(setting_base* base);
+	static void insert_game_setting(Entry_group* group);
 	static void insert_game_setting(mod_setting* mod);
 
 public:
