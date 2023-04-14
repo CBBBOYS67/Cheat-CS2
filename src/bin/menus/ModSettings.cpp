@@ -110,9 +110,9 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 
 
 	// Show input fields to edit the setting name and ini id
-	if (ImGui::InputTextRequired("Name", &setting_ptr->name))
+	if (ImGui::InputTextRequired("Name", &setting_ptr->name, ImGuiInputTextFlags_AutoSelectAll))
 		mod->json_dirty = true;
-	if (ImGui::InputText("Description", &setting_ptr->desc))
+	if (ImGui::InputText("Description", &setting_ptr->desc, ImGuiInputTextFlags_AutoSelectAll))
 		mod->json_dirty = true;
 
 	int current_type = setting_ptr->type;
@@ -220,7 +220,7 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 	if (incomplete_ini_id) {
 		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
 	}
-	if (ImGui::InputText("ini ID", &setting_ptr->ini_id))
+	if (ImGui::InputTextRequired("ini ID", &setting_ptr->ini_id))
 		mod->json_dirty = true;
 	
 	if (incomplete_ini_id) {
@@ -407,46 +407,7 @@ void ModSettings::show_modSetting(mod_setting* mod)
 				ImGui::OpenPopup("Edit Group");
 				ImGui::SetNextWindowPos(ImGui::GetMousePos());
 			}
-
-			// Context menu for editing group name
-			if (ImGui::BeginPopup("Edit Group")) {
-				if (ImGui::InputText("Group Name", &group->name))
-					mod->json_dirty = true;
-				// push red color for delete group button
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.1f, 0.15f, 1.0f));
-				if (ImGui::Button("Delete Group")) {
-					ImGui::OpenPopup("Delete Group confirmation");
-					ImGui::SetNextWindowPos(ImGui::GetMousePos());
-				}
-				ImGui::PopStyleColor();
-				if (ImGui::BeginPopupModal("Delete Group confirmation", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-					ImGui::Text("Are you sure you want to delete this group?");
-					ImGui::Separator();
-
-					if (ImGui::Button("Yes", ImVec2(120, 0))) {
-						for (auto& setting : group->settings) {
-							if (setting->type == kSettingType_Checkbox) {
-								if (dynamic_cast<setting_checkbox*>(setting)->control_id != "") {
-									// Remove the control from the control map
-									m_controls.erase(dynamic_cast<setting_checkbox*>(setting)->control_id);
-								}
-							}
-							delete setting;
-						}
-						auto it = std::find(mod->groups.begin(), mod->groups.end(), group);
-						mod->groups.erase(it);
-						mod->json_dirty = true;
-						ImGui::CloseCurrentPopup();
-					}
-					ImGui::SetItemDefaultFocus();
-					ImGui::SameLine();
-					if (ImGui::Button("No", ImVec2(120, 0))) {
-						ImGui::CloseCurrentPopup();
-					}
-					ImGui::EndPopup();
-				}
-				ImGui::EndPopup();
-			}
+			
 			ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, FLT_MAX));
 
 			//ImGui::BeginChild((group->name + "##settings").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysUseWindowPadding || ImGuiWindowFlags_AlwaysAutoResize);
@@ -579,8 +540,53 @@ void ModSettings::show_modSetting(mod_setting* mod)
 			}
 			ImGui::Unindent();
 			//ImGui::EndChild();
+		} else {
+			if (edit_mode && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+				ImGui::OpenPopup("Edit Group");
+				ImGui::SetNextWindowPos(ImGui::GetMousePos());
+			}
 		}
 
+
+		// Context menu for editing group name
+		if (ImGui::BeginPopup("Edit Group")) {
+			if (ImGui::InputText("Group Name", &group->name))
+				mod->json_dirty = true;
+			// push red color for delete group button
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.1f, 0.15f, 1.0f));
+			if (ImGui::Button("Delete Group")) {
+				ImGui::OpenPopup("Delete Group confirmation");
+				ImGui::SetNextWindowPos(ImGui::GetMousePos());
+			}
+			ImGui::PopStyleColor();
+			if (ImGui::BeginPopupModal("Delete Group confirmation", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+				ImGui::Text("Are you sure you want to delete this group?");
+				ImGui::Separator();
+
+				if (ImGui::Button("Yes", ImVec2(120, 0))) {
+					for (auto& setting : group->settings) {
+						if (setting->type == kSettingType_Checkbox) {
+							if (dynamic_cast<setting_checkbox*>(setting)->control_id != "") {
+								// Remove the control from the control map
+								m_controls.erase(dynamic_cast<setting_checkbox*>(setting)->control_id);
+							}
+						}
+						delete setting;
+					}
+					auto it = std::find(mod->groups.begin(), mod->groups.end(), group);
+					mod->groups.erase(it);
+					mod->json_dirty = true;
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SetItemDefaultFocus();
+				ImGui::SameLine();
+				if (ImGui::Button("No", ImVec2(120, 0))) {
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::EndPopup();
+			}
+			ImGui::EndPopup();
+		}
 		// Restore original header color
 		ImGui::PopStyleColor();
 
