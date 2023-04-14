@@ -1,7 +1,6 @@
 #include "PCH.h"
 #include <unordered_set>
 #include "Translator.h"
-
 class ModSettings
 {
 	enum setting_type
@@ -18,26 +17,18 @@ class ModSettings
 	{
 	public:
 		setting_type type;
-		std::string name;
-		std::string desc;
-
-		std::string name_t;
-		std::string desc_t;
+		Translatable name;
+		Translatable desc;
 		
 		std::string ini_section;
 		std::string ini_id;
-
 
 		std::string gameSetting;
 		std::vector<std::string> req;
 
 		bool editing = false;
 
-		const char* get_name();
-		const char* get_desc();
-
 		bool incomplete();
-
 		virtual ~setting_base() = default;
 	};
 
@@ -47,7 +38,7 @@ class ModSettings
 		setting_checkbox()
 		{
 			type = kSettingType_Checkbox;
-			name = "New Checkbox";
+			name = Translatable("New Checkbox");
 			value = true;
 			default_value = true;
 		}
@@ -63,7 +54,7 @@ class ModSettings
 		setting_slider() 
 		{
 			type = kSettingType_Slider; 
-			name = "New Slider";
+			name = Translatable("New Slider");
 			value = 0.0f;
 			min = 0.0f;
 			max = 1.0f;
@@ -88,7 +79,7 @@ class ModSettings
 		setting_textbox() 
 		{ 
 			type = kSettingType_Textbox; 
-			name = "New Textbox";
+			name = Translatable("New Textbox");
 			value = "";
 			default_value = "";
 		}
@@ -100,7 +91,7 @@ class ModSettings
 		setting_dropdown() 
 		{ 
 			type = kSettingType_Dropdown; 
-			name = "New Dropdown";
+			name = Translatable("New Dropdown");
 			value = 0;
 			default_value = 0;
 		}
@@ -116,7 +107,8 @@ class ModSettings
 		class mod_setting_group
 		{
 		public:
-			std::string name;
+			Translatable name;
+			Translatable desc;
 			std::vector<setting_base*> settings;
 		};
 		std::string name;
@@ -159,6 +151,7 @@ public:
 	static bool API_RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback);
 
 private:
+	static void show_reloadTranslationButton();
 	static void show_saveButton();
 	static void show_saveJsonButton();
 	static void show_modSetting(mod_setting* mod);
@@ -168,6 +161,4 @@ private:
 	static inline std::unordered_map<std::string, setting_checkbox*> m_controls;
 
 	static inline bool edit_mode = false;
-
-	static inline Translator* translator = nullptr;
 };

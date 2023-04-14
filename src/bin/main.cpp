@@ -22,6 +22,7 @@ void onSKSEInit()
 {
 	Renderer::Install();
 	Settings::init();
+	Translator::LoadTranslations(Settings::currLanguage);
 	ModSettings::init(); // init modsetting before everyone else
 }
 

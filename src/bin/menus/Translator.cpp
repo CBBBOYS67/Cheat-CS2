@@ -1,38 +1,6 @@
 #include "Translator.h"
 
-Translator::Language Translator::AsLanguage(const std::string& language)
-{
-	if (language == "EN")
-		return Language::English;
-	else if (language == "GE")
-		return Language::German;
-	else if (language == "FR")
-		return Language::French;
-	else if (language == "SP")
-		return Language::Spanish;
-	else if (language == "IT")
-		return Language::Italian;
-	else if (language == "RU")
-		return Language::Russian;
-	else if (language == "PL")
-		return Language::Polish;
-	else if (language == "PO")
-		return Language::Portuguese;
-	else if (language == "JA")
-		return Language::Japanese;
-	else if (language == "CH")
-		return Language::Chinese;
-	else if (language == "KO")
-		return Language::Korean;
-	else if (language == "TU")
-		return Language::Turkish;
-	else if (language == "AR")
-		return Language::Arabic;
-	else
-		return Language::Invalid;
-}
-
-inline std::string Translator::AsLanguageStr(Language language)
+std::string Translator::AsLanguageStr(Language language)
 {
 	switch (language) {
 	case Language::English:
@@ -67,7 +35,7 @@ inline std::string Translator::AsLanguageStr(Language language)
 }
 static const std::string TRANSLATION_DIR = "Data\\SKSE\\Plugins\\\dmenu\\customSettings\\translations";
 
-Translator::Translator(Language language)
+void Translator::LoadTranslations(Language language)
 {
 	INFO("Initializing translator for %s", AsLanguageStr(language));
 	std::string language_id = "_" + AsLanguageStr(language);
@@ -83,7 +51,7 @@ const char* Translator::Translate(TranslationID id)
 {
 	auto it = _translations.find(id);
 	if (it != _translations.end())
-		return it->second.data();
+		return it->second.c_str();
 	else
 		return nullptr;
 }
@@ -101,4 +69,32 @@ void Translator::LoadTranslation(std::filesystem::path txt_path)
 		}
 	}
 	file.close();
+}
+
+Translatable::Translatable(std::string def, std::string key)
+{
+	this->def = def;
+	this->key = key;
+}
+
+Translatable::Translatable(std::string def)
+{
+	this->def = def;
+	this->key = "";
+}
+Translatable::Translatable()
+{
+	this->def = "";
+	this->key = "";
+}
+
+const char* Translatable::get() const
+{
+	const char* ret = Translator::Translate(key);
+	return ret ? ret : def.c_str();
+}
+
+bool Translatable::empty()
+{
+	return def.empty() && key.empty();
 }

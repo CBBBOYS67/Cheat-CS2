@@ -15,7 +15,13 @@
 
 using json = nlohmann::json;
 
-// not used anymore, we auto save.
+void ModSettings::show_reloadTranslationButton()
+{
+	if (ImGui::Button("Reload Translation")) {
+		Translator::LoadTranslations(Settings::currLanguage);
+	}
+}
+  // not used anymore, we auto save.
 void ModSettings::show_saveButton()
 {
 	bool unsaved_changes = false;
@@ -85,13 +91,9 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 
 
 	// Show input fields to edit the setting name and ini id
-	if (ImGui::InputTextRequired("Name", &setting_ptr->name, ImGuiInputTextFlags_AutoSelectAll))
+	if (ImGui::InputTextRequired("Name", &setting_ptr->name.def, ImGuiInputTextFlags_AutoSelectAll))
 		mod->json_dirty = true;
-	if (ImGui::InputTextRequired("Description", &setting_ptr->desc, ImGuiInputTextFlags_AutoSelectAll))
-		mod->json_dirty = true;
-	if (ImGui::InputText("Name Translation ID", &setting_ptr->name_t, ImGuiInputTextFlags_AutoSelectAll))
-		mod->json_dirty = true;
-	if (ImGui::InputText("Desc Translation ID", &setting_ptr->desc_t, ImGuiInputTextFlags_AutoSelectAll))
+	if (ImGui::InputTextRequired("Description", &setting_ptr->desc.def, ImGuiInputTextFlags_AutoSelectAll))
 		mod->json_dirty = true;
 
 	int current_type = setting_ptr->type;
@@ -192,8 +194,18 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 	ImGui::EndChild();
 	
 	
+	ImGui::Text("Localization");
+	if (ImGui::BeginChild((std::string(setting_ptr->name.get()) + "##Localization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize)) {
+		if (ImGui::InputText("Name", &setting_ptr->name.key, ImGuiInputTextFlags_AutoSelectAll))
+			mod->json_dirty = true;
+		if (ImGui::InputText("Description", &setting_ptr->desc.key, ImGuiInputTextFlags_AutoSelectAll))
+			mod->json_dirty = true;
+		ImGui::EndChild();
+	}
+	
+	
 	ImGui::Text("Serialization");
-	ImGui::BeginChild((setting_ptr->name + "##serialization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
+	ImGui::BeginChild((std::string(setting_ptr->name.get()) + "##serialization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
 	
 	if (ImGui::InputTextRequired("ini ID", &setting_ptr->ini_id))
 		mod->json_dirty = true;
@@ -231,13 +243,13 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 		{
 			setting_checkbox* checkbox = dynamic_cast<setting_checkbox*>(setting_ptr);
 
-			if (ImGui::Checkbox(checkbox->get_name(), &checkbox->value)) {
+			if (ImGui::Checkbox(checkbox->name.get(), &checkbox->value)) {
 				mod->dirty = true;
 			}
 
-			if (!checkbox->desc.empty()) {
+			if (!checkbox->desc.get()) {
 				ImGui::SameLine();
-				ImGui::HoverNote(checkbox->get_desc());
+				ImGui::HoverNote(checkbox->desc.get());
 			}
 		}
 		break;
@@ -249,7 +261,7 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 
 			// Set the width of the slider to a fraction of the available width
 			ImGui::SetNextItemWidth(width);
-			if (ImGui::SliderFloatWithSteps(slider->get_name(), &slider->value, slider->min, slider->max, slider->step)) {
+			if (ImGui::SliderFloatWithSteps(slider->name.get(), &slider->value, slider->min, slider->max, slider->step)) {
 				changed = true;
 			}
 
@@ -272,9 +284,9 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 				mod->dirty = true;
 			}
 
-			if (!slider->desc.empty()) {
+			if (!slider->name.empty()) {
 				ImGui::SameLine();
-				ImGui::HoverNote(slider->get_desc());
+				ImGui::HoverNote(slider->desc.get());
 			}
 		}
 		break;
@@ -284,13 +296,13 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 			setting_textbox* textbox = dynamic_cast<setting_textbox*>(setting_ptr);
 
 			ImGui::SetNextItemWidth(width);
-			if (ImGui::InputText(textbox->get_name(), &textbox->value)) {
+			if (ImGui::InputText(textbox->name.get(), &textbox->value)) {
 				mod->dirty = true;
 			}
 
 			if (!textbox->desc.empty()) {
 				ImGui::SameLine();
-				ImGui::HoverNote(textbox->get_desc());
+				ImGui::HoverNote(textbox->desc.get());
 			}
 		}
 		break;
@@ -298,7 +310,7 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 	case kSettingType_Dropdown:
 		{
 			setting_dropdown* dropdown = dynamic_cast<setting_dropdown*>(setting_ptr);
-			const char* name = dropdown->get_name();
+			const char* name = dropdown->name.get();
 			int selected = dropdown->value;
 
 			std::vector<std::string> options = dropdown->options;
@@ -327,7 +339,7 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 
 			if (!dropdown->desc.empty()) {
 				ImGui::SameLine();
-				ImGui::HoverNote(dropdown->get_desc());
+				ImGui::HoverNote(dropdown->desc.get());
 			}
 		}
 		break;
@@ -349,7 +361,7 @@ void ModSettings::show_modSetting(mod_setting* mod)
 	if (edit_mode) {
 		if (ImGui::Button("Add Group")) {
 			mod_setting::mod_setting_group* group = new mod_setting::mod_setting_group();
-			group->name = "New Group";
+			group->name.def = "New Group";
 			mod->groups.push_back(group);
 			mod->json_dirty = true;
 		}
@@ -385,7 +397,14 @@ void ModSettings::show_modSetting(mod_setting* mod)
 		}
 
 		// Show collapsing header and child container
-		if (ImGui::CollapsingHeader(group->name.c_str())) {
+		if (ImGui::CollapsingHeader(group->name.get())) {
+			if (!group->desc.empty()) {
+				if (ImGui::IsItemHovered()) {
+					ImGui::BeginTooltip();
+					ImGui::Text(group->desc.get());
+					ImGui::EndTooltip();
+				}
+			}
 			// Check if the mod settings are in edit mode and right mouse button is clicked
 			if (edit_mode && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
 				ImGui::OpenPopup("Edit Group");
@@ -528,7 +547,13 @@ void ModSettings::show_modSetting(mod_setting* mod)
 
 		// Context menu for editing group name
 		if (ImGui::BeginPopup("Edit Group")) {
-			if (ImGui::InputText("Group Name", &group->name))
+			if (ImGui::InputText("Name", &group->name.def))
+				mod->json_dirty = true;
+			if (ImGui::InputText("Name Translation Key", &group->name.key))
+				mod->json_dirty = true;
+			if (ImGui::InputText("Description", &group->desc.def))
+				mod->json_dirty = true;
+			if (ImGui::InputText("Description Translation Key", &group->desc.key))
 				mod->json_dirty = true;
 			// push red color for delete group button
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.1f, 0.15f, 1.0f));
@@ -584,6 +609,7 @@ void ModSettings::show()
 	show_saveButton();
 	if (edit_mode) {
 		show_saveJsonButton();
+		show_reloadTranslationButton();
 	}
 	// a button on the rhs of this same line
 	ImGui::SameLine(ImGui::GetWindowWidth() - 100.0f);  // Move cursor to the right side of the window
@@ -602,7 +628,6 @@ void ModSettings::show()
 static const std::string SETTINGS_DIR = "Data\\SKSE\\Plugins\\\dmenu\\customSettings";
 void ModSettings::init()
 {
-	translator = new Translator(Settings::currLanguage);
 	// Load all mods from the "Mods" directory
 	namespace fs = std::filesystem;
 	for (auto& file : std::filesystem::directory_iterator(SETTINGS_DIR)) {
@@ -659,7 +684,19 @@ void ModSettings::load_json(std::filesystem::path path)
 		// Iterate through each setting group in the JSON
 		for (auto& group_json : mod_json["Groups"]) {
 			mod_setting::mod_setting_group* group = new mod_setting::mod_setting_group();
-			group->name = group_json["group"].get<std::string>();
+			group->name.def = group_json["group"].get<std::string>();
+			if (group_json.contains("desc")) {
+				group->desc.def = group_json["desc"].get<std::string>();
+			}
+			if (group_json.contains("translation")) {
+				auto group_translation_json = group_json["translation"];
+				if (group_translation_json.contains("name")) {
+					group->name.key = group_json["translation"]["name"].get<std::string>();
+				}
+				if (group_translation_json.contains("desc")) {
+					group->desc.key = group_json["translation"]["description"].get<std::string>();
+				}
+			}
 
 			// Iterate through each setting in the group
 			for (auto& setting_json : group_json["settings"]) {
@@ -697,9 +734,9 @@ void ModSettings::load_json(std::filesystem::path path)
 					continue;
 				}
 
-				s->name = setting_json["text"]["name"].get<std::string>();
+				s->name.def = setting_json["text"]["name"].get<std::string>();
 				if (setting_json["text"].contains("desc")) {
-					s->desc = setting_json["text"]["desc"].get<std::string>();
+					s->desc.def = setting_json["text"]["desc"].get<std::string>();
 				}
 
 				if (setting_json.contains("gameSetting")) {
@@ -707,10 +744,10 @@ void ModSettings::load_json(std::filesystem::path path)
 				}
 				if (setting_json.contains("translation")) {
 					if (setting_json["translation"].contains("name")) {
-						s->name_t = setting_json["translation"]["name"].get<std::string>();
+						s->name.key = setting_json["translation"]["name"].get<std::string>();
 					}
 					if (setting_json["translation"].contains("desc")) {
-						s->desc_t = setting_json["translation"]["desc"].get<std::string>();
+						s->desc.key = setting_json["translation"]["desc"].get<std::string>();
 					}
 				}
 
@@ -754,19 +791,18 @@ void ModSettings::save_mod_config(mod_setting* mod)
 
 	for (auto& group : mod->groups) {
 		nlohmann::json group_json;
-		group_json["group"] = group->name;
+		group_json["group"] = group->name.def;
+		group_json["translation"]["name"] = group->name.key;
+		group_json["translation"]["desc"] = group->desc.key;
 
 		for (auto& setting : group->settings) {
 			nlohmann::json setting_json;
 
-			setting_json["text"]["name"] = setting->name;
-			setting_json["text"]["desc"] = setting->desc;
-			if (!setting->name_t.empty()) {
-				setting_json["translation"]["name"] = setting->name_t;
-			}
-			if (!setting->desc_t.empty()) {
-				setting_json["translation"]["desc"] = setting->desc_t;
-			}
+			setting_json["text"]["name"] = setting->name.def;
+			setting_json["text"]["desc"] = setting->desc.def;
+			setting_json["translation"]["name"] = setting->name.key;
+			setting_json["translation"]["desc"] = setting->desc.key;
+
 			setting_json["ini"]["section"] = setting->ini_section;
 			setting_json["ini"]["id"] = setting->ini_id;
 
@@ -865,7 +901,7 @@ void ModSettings::load_ini(mod_setting* mod)
 			if (ini.KeyExists(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str())) {
 				value = ini.GetValue(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str(), "");
 			} else {
-				INFO(".ini file for {} has no value for {}. Creating a new .ini file.", mod->name, setting_ptr->name);
+				INFO(".ini file for {} has no value for {}. Creating a new .ini file.", mod->name, setting_ptr->name.get());
 				construct_ini(mod);
 				return;
 			}
@@ -954,7 +990,7 @@ void ModSettings::save_game_setting(mod_setting* mod)
 			if (setting_ptr->gameSetting.empty()) { // no gamesetting mapping
 				continue;
 			}
-			INFO("querying setting {}", setting_ptr->name);
+			INFO("querying setting {}", setting_ptr->name.def);
 			RE::Setting* s = gsc->GetSetting(setting_ptr->gameSetting.data());
 			if (!s) {
 				ERROR("Game setting not found when trying to save game setting.");
@@ -1018,21 +1054,9 @@ void ModSettings::insert_game_setting(mod_setting* mod)
 	}
 }
 
-const char* ModSettings::setting_base::get_name()
-{
-	const char* ret = translator->Translate(name_t);
-	return ret ? ret : this->name.data();  // if translation fails, return the untranslated name
-}
-
-const char* ModSettings::setting_base::get_desc()
-{
-	const char* ret = translator->Translate(desc_t);
-	return ret ? ret : this->desc.data();  // if translation fails, return the untranslated desc
-}
-
 bool ModSettings::setting_base::incomplete()
 {
-	return this->name.empty() || this->ini_id.empty() || this->ini_section.empty();
+	return this->name.def.empty() || this->ini_id.empty() || this->ini_section.empty();
 }
 
 void ModSettings::save_all_game_setting()
