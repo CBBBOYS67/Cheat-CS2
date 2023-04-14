@@ -71,7 +71,6 @@ void DMenu::init(float a_screenWidth, float a_screenHeight)
 	INFO("Initializing DMenu");
 	AIM::init();
 	Trainer::init();
-	Settings::init();
 
 	ImVec2 mainWindowSize = { float(a_screenWidth * Settings::relative_window_size_h), float(a_screenHeight * Settings::relative_window_size_v) };
 	ImGui::SetNextWindowSize(mainWindowSize, ImGuiCond_FirstUseEver);

@@ -23,7 +23,7 @@ namespace ini
 		loader.save(Settings::lockWindowPos, "lockWindowPos");
 
 		loader.setActiveSection("Localization");
-		uint32_t lan = static_cast<uint32_t>(Translator::Language);
+		uint32_t lan = static_cast<uint32_t>(Settings::currLanguage);
 		loader.save(lan, "language");
 
 		loader.flush();
@@ -43,7 +43,7 @@ namespace ini
 		loader.setActiveSection("Localization");
 		uint32_t lan;
 		loader.load(lan, "language");
-		Translator::Language = static_cast<Translator::Language>(lan);
+		Settings::currLanguage = static_cast<Translator::Language>(lan);
 	}
 
 	void init()
@@ -114,11 +114,11 @@ namespace Localization
 
 	void show()
 	{
-		if (ImGui::BeginCombo("Language", _languages[(int)Translator::Language].second.c_str())) {
+		if (ImGui::BeginCombo("Language", _languages[(int)Settings::currLanguage].second.c_str())) {
 			for (int i = 0; i < _languages.size(); i++) {
-				bool isSelected = ((int)Translator::Language == i);
+				bool isSelected = ((int)Settings::currLanguage == i);
 				if (ImGui::Selectable(_languages[i].second.c_str(), isSelected)) {
-					Translator::Language = static_cast<Translator::Language>(i);
+					Settings::currLanguage = static_cast<Translator::Language>(i);
 				}
 			}
 			ImGui::EndCombo();

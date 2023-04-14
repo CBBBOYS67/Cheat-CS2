@@ -202,17 +202,7 @@ namespace ImGui
 			ImGui::EndTooltip();
 		}
 	}
-	void InputTextStr(const char* label, std::string* dest, size_t max_len)
-	{
-		char* buffer = new char[max_len];
-		strncpy(buffer, dest->c_str(), max_len);
-		buffer[max_len] = '\0';
 
-		ImGui::InputText(label, buffer, max_len);
-
-		*dest = buffer;
-		dest->resize(strnlen(buffer, max_len));
-	}
 
 	bool ToggleButton(const char* str_id, bool* v)
 	{

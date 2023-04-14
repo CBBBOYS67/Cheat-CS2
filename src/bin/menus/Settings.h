@@ -11,7 +11,7 @@ public:
 	static inline bool lockWindowPos = false;
 	static inline bool lockWindowSize = false;
 
-	static inline Translator::Language language = Translator::Language::English;
+	static inline Translator::Language currLanguage = Translator::Language::English;
 
 	static void show();
 

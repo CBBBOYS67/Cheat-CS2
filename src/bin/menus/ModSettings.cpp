@@ -11,6 +11,7 @@
 #include "ModSettings.h"
 
 #include "bin/Utils.h"
+#include "Settings.h"
 
 using json = nlohmann::json;
 
@@ -86,7 +87,11 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 	// Show input fields to edit the setting name and ini id
 	if (ImGui::InputTextRequired("Name", &setting_ptr->name, ImGuiInputTextFlags_AutoSelectAll))
 		mod->json_dirty = true;
-	if (ImGui::InputText("Description", &setting_ptr->desc, ImGuiInputTextFlags_AutoSelectAll))
+	if (ImGui::InputTextRequired("Description", &setting_ptr->desc, ImGuiInputTextFlags_AutoSelectAll))
+		mod->json_dirty = true;
+	if (ImGui::InputText("Name Translation ID", &setting_ptr->name_t, ImGuiInputTextFlags_AutoSelectAll))
+		mod->json_dirty = true;
+	if (ImGui::InputText("Desc Translation ID", &setting_ptr->desc_t, ImGuiInputTextFlags_AutoSelectAll))
 		mod->json_dirty = true;
 
 	int current_type = setting_ptr->type;
@@ -202,9 +207,9 @@ void ModSettings::show_setting_author(setting_base* setting_ptr, mod_setting* mo
 	if (setting_ptr->type == kSettingType_Slider) {
 		if (!setting_ptr->gameSetting.empty()) {
 			switch (setting_ptr->gameSetting[0]) {
-				case "f":
-				case "i":
-				case "u":
+				case 'f':
+				case 'i':
+				case 'u':
 					break;
 				default:
 					ImGui::TextColored(ImVec4(1, 0, 0, 1), "For sliders, game setting must start with f, i, or u for float, int, or uint respectively for type specification.");
@@ -226,13 +231,13 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 		{
 			setting_checkbox* checkbox = dynamic_cast<setting_checkbox*>(setting_ptr);
 
-			if (ImGui::Checkbox(checkbox->name.c_str(), &checkbox->value)) {
+			if (ImGui::Checkbox(checkbox->get_name(), &checkbox->value)) {
 				mod->dirty = true;
 			}
 
 			if (!checkbox->desc.empty()) {
 				ImGui::SameLine();
-				ImGui::HoverNote(checkbox->desc.c_str());
+				ImGui::HoverNote(checkbox->get_desc());
 			}
 		}
 		break;
@@ -244,7 +249,7 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 
 			// Set the width of the slider to a fraction of the available width
 			ImGui::SetNextItemWidth(width);
-			if (ImGui::SliderFloatWithSteps(slider->name.c_str(), &slider->value, slider->min, slider->max, slider->step)) {
+			if (ImGui::SliderFloatWithSteps(slider->get_name(), &slider->value, slider->min, slider->max, slider->step)) {
 				changed = true;
 			}
 
@@ -269,7 +274,7 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 
 			if (!slider->desc.empty()) {
 				ImGui::SameLine();
-				ImGui::HoverNote(slider->desc.c_str());
+				ImGui::HoverNote(slider->get_desc());
 			}
 		}
 		break;
@@ -279,13 +284,13 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 			setting_textbox* textbox = dynamic_cast<setting_textbox*>(setting_ptr);
 
 			ImGui::SetNextItemWidth(width);
-			if (ImGui::InputText(textbox->name.data(), &textbox->value)) {
+			if (ImGui::InputText(textbox->get_name(), &textbox->value)) {
 				mod->dirty = true;
 			}
 
 			if (!textbox->desc.empty()) {
 				ImGui::SameLine();
-				ImGui::HoverNote(textbox->desc.c_str());
+				ImGui::HoverNote(textbox->get_desc());
 			}
 		}
 		break;
@@ -293,7 +298,7 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 	case kSettingType_Dropdown:
 		{
 			setting_dropdown* dropdown = dynamic_cast<setting_dropdown*>(setting_ptr);
-			const char* name = dropdown->name.c_str();
+			const char* name = dropdown->get_name();
 			int selected = dropdown->value;
 
 			std::vector<std::string> options = dropdown->options;
@@ -322,7 +327,7 @@ void ModSettings::show_setting_user(setting_base* setting_ptr, mod_setting* mod)
 
 			if (!dropdown->desc.empty()) {
 				ImGui::SameLine();
-				ImGui::HoverNote(dropdown->desc.c_str());
+				ImGui::HoverNote(dropdown->get_desc());
 			}
 		}
 		break;
@@ -430,16 +435,16 @@ void ModSettings::show_modSetting(mod_setting* mod)
 			// Iterate through each setting in the group
 			for (auto& setting_ptr : group->settings) {
 				ImGui::PushID(setting_ptr);
-				bool show = true;
+				bool available = true;
 				for (auto& r : setting_ptr->req) {
 					if (m_controls.contains(r)) {
 						if (m_controls[r]->value == false) {
-							show = false;
+							available = false;
 							break;
 						}
 					}
 				}
-				if (!show) {
+				if (!available) {
 					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
 					ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
 					ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
@@ -504,7 +509,7 @@ void ModSettings::show_modSetting(mod_setting* mod)
 					ImGui::PopStyleColor();
 				}
 
-				if (!show) {
+				if (!available) {
 					ImGui::PopStyleVar();
 					ImGui::PopItemFlag();
 					ImGui::PopStyleColor();
@@ -597,6 +602,7 @@ void ModSettings::show()
 static const std::string SETTINGS_DIR = "Data\\SKSE\\Plugins\\\dmenu\\customSettings";
 void ModSettings::init()
 {
+	translator = new Translator(Settings::currLanguage);
 	// Load all mods from the "Mods" directory
 	namespace fs = std::filesystem;
 	for (auto& file : std::filesystem::directory_iterator(SETTINGS_DIR)) {
@@ -699,6 +705,14 @@ void ModSettings::load_json(std::filesystem::path path)
 				if (setting_json.contains("gameSetting")) {
 					s->gameSetting = setting_json["gameSetting"].get<std::string>();
 				}
+				if (setting_json.contains("translation")) {
+					if (setting_json["translation"].contains("name")) {
+						s->name_t = setting_json["translation"]["name"].get<std::string>();
+					}
+					if (setting_json["translation"].contains("desc")) {
+						s->desc_t = setting_json["translation"]["desc"].get<std::string>();
+					}
+				}
 
 				if (setting_json.contains("control")) {
 					if (setting_json["control"].contains("id")) {
@@ -747,6 +761,12 @@ void ModSettings::save_mod_config(mod_setting* mod)
 
 			setting_json["text"]["name"] = setting->name;
 			setting_json["text"]["desc"] = setting->desc;
+			if (!setting->name_t.empty()) {
+				setting_json["translation"]["name"] = setting->name_t;
+			}
+			if (!setting->desc_t.empty()) {
+				setting_json["translation"]["desc"] = setting->desc_t;
+			}
 			setting_json["ini"]["section"] = setting->ini_section;
 			setting_json["ini"]["id"] = setting->ini_id;
 
@@ -998,6 +1018,18 @@ void ModSettings::insert_game_setting(mod_setting* mod)
 	}
 }
 
+const char* ModSettings::setting_base::get_name()
+{
+	const char* ret = translator->Translate(name_t);
+	return ret ? ret : this->name.data();  // if translation fails, return the untranslated name
+}
+
+const char* ModSettings::setting_base::get_desc()
+{
+	const char* ret = translator->Translate(desc_t);
+	return ret ? ret : this->desc.data();  // if translation fails, return the untranslated desc
+}
+
 bool ModSettings::setting_base::incomplete()
 {
 	return this->name.empty() || this->ini_id.empty() || this->ini_section.empty();
@@ -1051,5 +1083,3 @@ extern "C" DLLEXPORT bool RegisterForSettingUpdate(std::string a_mod, std::funct
 {
 	return ModSettings::API_RegisterForSettingUpdate(a_mod, a_callback);
 }
-
-

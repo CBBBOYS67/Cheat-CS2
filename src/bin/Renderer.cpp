@@ -14,6 +14,8 @@
 
 #include "Utils.h"
 #include "menus/Settings.h"
+
+#include "menus/Translator.h"
 // stole this from MaxSu's detection meter
 
 namespace stl
@@ -103,14 +105,17 @@ void Renderer::D3DInitHook::thunk()
 	
 	auto& io = ImGui::GetIO();
 	ImFont* font = nullptr;
-	switch ((Settings::Language)lan) {
-	case Settings::Language::English:
+	switch ((Translator::Language)lan) {
+	case Translator::Language::English:
 		break;
-	case Settings::Language::ChineseSimplified:
+	case Translator::Language::Chinese:
 		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 16.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
 		break;
-	case Settings::Language::ChineseTraditional:
-		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 16.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
+	case Translator::Language::Japanese:
+		// load japanese font
+		break;
+	case Translator::Language::Korean:
+		// load korean font
 		break;
 	default:
 		//unknown language

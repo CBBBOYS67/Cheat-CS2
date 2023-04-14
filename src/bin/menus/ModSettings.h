@@ -1,5 +1,6 @@
 #include "PCH.h"
 #include <unordered_set>
+#include "Translator.h"
 
 class ModSettings
 {
@@ -19,6 +20,9 @@ class ModSettings
 		setting_type type;
 		std::string name;
 		std::string desc;
+
+		std::string name_t;
+		std::string desc_t;
 		
 		std::string ini_section;
 		std::string ini_id;
@@ -28,6 +32,9 @@ class ModSettings
 		std::vector<std::string> req;
 
 		bool editing = false;
+
+		const char* get_name();
+		const char* get_desc();
 
 		bool incomplete();
 
@@ -161,4 +168,6 @@ private:
 	static inline std::unordered_map<std::string, setting_checkbox*> m_controls;
 
 	static inline bool edit_mode = false;
+
+	static inline Translator* translator = nullptr;
 };
