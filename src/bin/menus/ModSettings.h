@@ -1,6 +1,7 @@
 #include "PCH.h"
 #include <unordered_set>
 #include "Translator.h"
+#include "imgui.h"
 class ModSettings
 {
 	enum entry_type
@@ -10,11 +11,10 @@ class ModSettings
 		kEntryType_Textbox,
 		kEntryType_Dropdown,
 		kEntryType_Text,
-		kEntryType_Header,
 		kSettingType_Invalid
 	};
 
-	class entry
+	class Entry
 	{
 	public:
 		entry_type type;
@@ -22,39 +22,39 @@ class ModSettings
 		Translatable desc;
 		std::vector<std::string> req;
 		bool editing = false;
-		constexpr bool is_setting() const { return type != kEntryType_Header && type != kEntryType_Text; }
-		virtual ~entry() = default;
+		virtual bool is_setting() const { return false; }
+		virtual ~Entry() = default;
+		Entry() 
+		{
+			type = kSettingType_Invalid;
+		}
 	};
 
-	class text : entry
+	class Entry_text : public Entry
 	{
 	public:
-		text()
+		std::string stuff;
+		ImVec4 _color;
+
+		Entry_text()
 		{
 			type = kEntryType_Text;
 			name = Translatable("New Text");
+			_color = ImVec4(1, 1, 1, 1);
 		}
 	};
 
-	class header : entry
-	{
-	public:
-		header()
-		{
-			type = kEntryType_Header;
-			name = Translatable("New Header");
-		}
-	};
 	
 	class setting_checkbox;
 
-	class setting_base : public entry
+	class setting_base : public Entry
 	{
 	public:
 		std::string ini_section;
 		std::string ini_id;
 
 		std::string gameSetting;
+		bool is_setting() const override { return true; }
 		virtual ~setting_base() = default;
 	};
 
@@ -135,7 +135,7 @@ class ModSettings
 		public:
 			Translatable name;
 			Translatable desc;
-			std::vector<entry*> entries;
+			std::vector<Entry*> entries;
 		};
 		std::string name;
 		std::vector<mod_setting_group*> groups;
@@ -181,8 +181,8 @@ private:
 	static void show_saveButton();
 	static void show_saveJsonButton();
 	static void show_modSetting(mod_setting* mod);
-	static void show_entry_edit(entry* base, mod_setting* mod);
-	static void show_entry(entry* base, mod_setting* mod);
+	static void show_entry_edit(Entry* base, mod_setting* mod);
+	static void show_entry(Entry* base, mod_setting* mod);
 
 	static inline std::unordered_map<std::string, setting_checkbox*> m_controls;
 
