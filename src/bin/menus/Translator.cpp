@@ -37,7 +37,8 @@ static const std::string TRANSLATION_DIR = "Data\\SKSE\\Plugins\\\dmenu\\customS
 
 void Translator::LoadTranslations(Language language)
 {
-	INFO("Initializing translator for %s", AsLanguageStr(language));
+	INFO("(re)Initializing {} translator.", AsLanguageStr(language));
+	_translations.clear();
 	std::string language_id = "_" + AsLanguageStr(language);
 	for (auto& file : std::filesystem::directory_iterator(TRANSLATION_DIR)) {
 		if (file.path().extension() == ".txt" && file.path().stem().string().ends_with(language_id)) {

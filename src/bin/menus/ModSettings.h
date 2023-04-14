@@ -3,32 +3,58 @@
 #include "Translator.h"
 class ModSettings
 {
-	enum setting_type
+	enum entry_type
 	{
-		kSettingType_Checkbox,
-		kSettingType_Slider,
-		kSettingType_Textbox,
-		kSettingType_Dropdown,
+		kEntryType_Checkbox,
+		kEntryType_Slider,
+		kEntryType_Textbox,
+		kEntryType_Dropdown,
+		kEntryType_Text,
+		kEntryType_Header,
 		kSettingType_Invalid
 	};
-	class setting_checkbox;
 
-	class setting_base
+	class entry
 	{
 	public:
-		setting_type type;
+		entry_type type;
 		Translatable name;
 		Translatable desc;
-		
+		std::vector<std::string> req;
+		bool editing = false;
+		constexpr bool is_setting() const { return type != kEntryType_Header && type != kEntryType_Text; }
+		virtual ~entry() = default;
+	};
+
+	class text : entry
+	{
+	public:
+		text()
+		{
+			type = kEntryType_Text;
+			name = Translatable("New Text");
+		}
+	};
+
+	class header : entry
+	{
+	public:
+		header()
+		{
+			type = kEntryType_Header;
+			name = Translatable("New Header");
+		}
+	};
+	
+	class setting_checkbox;
+
+	class setting_base : public entry
+	{
+	public:
 		std::string ini_section;
 		std::string ini_id;
 
 		std::string gameSetting;
-		std::vector<std::string> req;
-
-		bool editing = false;
-
-		bool incomplete();
 		virtual ~setting_base() = default;
 	};
 
@@ -37,7 +63,7 @@ class ModSettings
 	public:
 		setting_checkbox()
 		{
-			type = kSettingType_Checkbox;
+			type = kEntryType_Checkbox;
 			name = Translatable("New Checkbox");
 			value = true;
 			default_value = true;
@@ -53,7 +79,7 @@ class ModSettings
 	public:
 		setting_slider() 
 		{
-			type = kSettingType_Slider; 
+			type = kEntryType_Slider; 
 			name = Translatable("New Slider");
 			value = 0.0f;
 			min = 0.0f;
@@ -78,7 +104,7 @@ class ModSettings
 		std::string default_value;
 		setting_textbox() 
 		{ 
-			type = kSettingType_Textbox; 
+			type = kEntryType_Textbox; 
 			name = Translatable("New Textbox");
 			value = "";
 			default_value = "";
@@ -90,7 +116,7 @@ class ModSettings
 	public:
 		setting_dropdown() 
 		{ 
-			type = kSettingType_Dropdown; 
+			type = kEntryType_Dropdown; 
 			name = Translatable("New Dropdown");
 			value = 0;
 			default_value = 0;
@@ -109,7 +135,7 @@ class ModSettings
 		public:
 			Translatable name;
 			Translatable desc;
-			std::vector<setting_base*> settings;
+			std::vector<entry*> entries;
 		};
 		std::string name;
 		std::vector<mod_setting_group*> groups;
@@ -155,8 +181,8 @@ private:
 	static void show_saveButton();
 	static void show_saveJsonButton();
 	static void show_modSetting(mod_setting* mod);
-	static void show_setting_author(setting_base* base, mod_setting* mod);
-	static void show_setting_user(setting_base* base, mod_setting* mod);
+	static void show_entry_edit(entry* base, mod_setting* mod);
+	static void show_entry(entry* base, mod_setting* mod);
 
 	static inline std::unordered_map<std::string, setting_checkbox*> m_controls;
 
