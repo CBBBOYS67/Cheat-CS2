@@ -22,13 +22,8 @@ void ModSettings::show_reloadTranslationButton()
   // not used anymore, we auto save.
 void ModSettings::show_saveButton()
 {
-	bool unsaved_changes = false;
-	for (auto& mod : mods) {
-		if (mod->dirty) {
-			unsaved_changes = true;
-			break;
-		}
-	}
+	bool unsaved_changes = !ini_dirty_mods.empty();
+	
 	if (unsaved_changes) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.3f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.8f, 0.4f, 1.0f));
@@ -36,16 +31,13 @@ void ModSettings::show_saveButton()
     }
 
     if (ImGui::Button("Save", ImVec2(120, 30))) {
-        for (auto& mod : mods) {
-            if (mod->dirty) {
-                save_ini(mod);
-				save_game_setting(mod);
-                mod->dirty = false;
-				for (auto callback : mod->callbacks) {
-					callback();
-				}
-            }
-        }
+		for (auto& mod : ini_dirty_mods) {
+			flush_ini(mod);
+			flush_game_setting(mod);
+			for (auto callback : mod->callbacks) {
+				callback();
+			}
+		}
     }
 
     if (unsaved_changes) {
@@ -55,13 +47,8 @@ void ModSettings::show_saveButton()
 
 void ModSettings::show_saveJsonButton()
 {
-	bool unsaved_changes = false;
-	for (auto& mod : mods) {
-		if (mod->json_dirty) {
-			unsaved_changes = true;
-			break;
-		}
-	}
+	bool unsaved_changes = !json_dirty_mods.empty();
+
 	if (unsaved_changes) {
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.3f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.8f, 0.4f, 1.0f));
@@ -69,11 +56,8 @@ void ModSettings::show_saveJsonButton()
 	}
 
 	if (ImGui::Button("Save Config", ImVec2(120, 30))) {
-		for (auto& mod : mods) {
-			if (mod->json_dirty) {
-				save_mod_config(mod);
-				mod->json_dirty = false;
-			}
+		for (auto& mod : json_dirty_mods) {
+			flush_json(mod);
 		}
 	}
 
@@ -87,12 +71,13 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 {
 	ImGui::PushID(entry);
 
+	bool edited = false;
 
 	// Show input fields to edit the setting name and ini id
 	if (ImGui::InputTextRequired("Name", &entry->name.def, ImGuiInputTextFlags_AutoSelectAll))
-		mod->json_dirty = true;
+		edited = true;
 	if (ImGui::InputText("Description", &entry->desc.def, ImGuiInputTextFlags_AutoSelectAll))
-		mod->json_dirty = true;
+		edited = true;
 
 	int current_type = entry->type;
 
@@ -102,7 +87,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 		{
 			setting_checkbox* checkbox = dynamic_cast<setting_checkbox*>(entry);
 			if (ImGui::Checkbox("Default", &checkbox->default_value)) {
-				mod->json_dirty = true;
+				edited = true;
 			}
 			std::string old_control_id = checkbox->control_id;
 			if (ImGui::InputText("Control ID", &checkbox->control_id)) { // on change of control id
@@ -112,7 +97,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 				if (!checkbox->control_id.empty()) {
 					m_controls[checkbox->control_id] = checkbox;  // update control id
 				}
-				mod->json_dirty = true;
+				edited = true;
 			}
 			break;
 		}
@@ -120,22 +105,22 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 		{
 			setting_slider* slider = dynamic_cast<setting_slider*>(entry);
 			if (ImGui::InputFloat("Default", &slider->default_value)) 
-				mod->json_dirty = true;
+				edited = true;
 			if (ImGui::InputFloat("Min", &slider->min))
-				mod->json_dirty = true;
+				edited = true;
 			if (ImGui::InputFloat("Max", &slider->max))
-				mod->json_dirty = true;
+				edited = true;
 			if (ImGui::InputFloat("Step", &slider->step))
-				mod->json_dirty = true;
+				edited = true;
 			break;
 		}
 	case kEntryType_Textbox:
 		{
 			setting_textbox* textbox = dynamic_cast<setting_textbox*>(entry);
 			if (ImGui::InputText("Default", &textbox->default_value))
-				mod->json_dirty = true;
+				edited = true;
 			if (ImGui::InputInt("Size", &textbox->buf_size))
-				mod->json_dirty = true;
+				edited = true;
 			break;
 		}
 	case kEntryType_Dropdown:
@@ -147,19 +132,19 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 				int buf;
 				if (ImGui::InputInt("Default", &buf, 0, 100)) {
 					dropdown->default_value = buf;
-					mod->json_dirty = true;
+					edited = true;
 				}
 				if (ImGui::Button("Add")) {
 					dropdown->options.emplace_back();
-					mod->json_dirty = true;
+					edited = true;
 				}
 				for (int i = 0; i < dropdown->options.size(); i++) {
 					ImGui::PushID(i);
-					if (ImGui::InputText("Option", &dropdown->options[i])) mod->json_dirty = true;
+					if (ImGui::InputText("Option", &dropdown->options[i])) edited = true;
 					ImGui::SameLine();
 					if (ImGui::Button("-")) {
 						dropdown->options.erase(dropdown->options.begin() + i);
-						mod->json_dirty = true;
+						edited = true;
 					}
 					ImGui::PopID();
 				}
@@ -177,7 +162,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 				float colorArray[4] = { text->_color.x, text->_color.y, text->_color.z, text->_color.w };
 				if (ImGui::ColorEdit4("Color", colorArray)) {
 					text->_color = ImVec4(colorArray[0], colorArray[1], colorArray[2], colorArray[3]);
-					mod->json_dirty = true;
+					edited = true;
 				}
 				ImGui::EndChild();
 			}
@@ -192,16 +177,16 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 	
 	if (ImGui::Button("Add")) {
 		entry->req.emplace_back();
-		mod->json_dirty = true;
+		edited = true;
 	}
 	for (int i = 0; i < entry->req.size(); i++) {
 		ImGui::PushID(i);
 		if (ImGui::InputText("Option", &entry->req[i]))
-			mod->json_dirty = true;
+			edited = true;
 		ImGui::SameLine();
 		if (ImGui::Button("-")) {
 			entry->req.erase(entry->req.begin() + i);
-			mod->json_dirty = true;
+			edited = true;
 		}
 		ImGui::PopID();
 	}
@@ -211,9 +196,9 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 	ImGui::Text("Localization");
 	if (ImGui::BeginChild((std::string(entry->name.def) + "##Localization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize)) {
 		if (ImGui::InputText("Name", &entry->name.key, ImGuiInputTextFlags_AutoSelectAll))
-			mod->json_dirty = true;
+			edited = true;
 		if (ImGui::InputText("Description", &entry->desc.key, ImGuiInputTextFlags_AutoSelectAll))
-			mod->json_dirty = true;
+			edited = true;
 		ImGui::EndChild();
 	}
 	
@@ -222,13 +207,13 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 		ImGui::Text("Serialization");
 		if (ImGui::BeginChild((std::string(setting->name.def) + "##serialization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize)) {
 			if (ImGui::InputTextRequired("ini ID", &setting->ini_id))
-				mod->json_dirty = true;
+				edited = true;
 
 			if (ImGui::InputTextRequired("ini Section", &setting->ini_section))
-				mod->json_dirty = true;
+				edited = true;
 
 			if (ImGui::InputText("Game Setting", &setting->gameSetting)) {
-				mod->json_dirty = true;
+				edited = true;
 			}
 			if (setting->type == kEntryType_Slider) {
 				if (!setting->gameSetting.empty()) {
@@ -246,30 +231,36 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 			ImGui::EndChild();
 		}
 	}
-	
-	
-	
 
+	if (edited) {
+		json_dirty_mods.insert(mod);
+	}
+	
+	
 	//ImGui::EndChild();
 	ImGui::PopID();
 }
 
 void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 {
-	ImGui::PushID(entry);		bool available = true;
-		for (auto& r : entry->req) {
-			if (m_controls.contains(r)) {
-				if (m_controls[r]->value == false) {
-					available = false;
-					break;
-				}
+	ImGui::PushID(entry);
+	bool edited = false;
+	
+	// check if all control requirements are met
+	bool available = true;
+	for (auto& r : entry->req) {
+		if (m_controls.contains(r)) {
+			if (m_controls[r]->value == false) {
+				available = false;
+				break;
 			}
 		}
-		if (!available) {
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
-		}
+	}
+	if (!available) {
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+	}
 		
 	float width = ImGui::GetContentRegionAvail().x * 0.5f;
 	switch (entry->type) {
@@ -278,7 +269,7 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 			setting_checkbox* checkbox = dynamic_cast<setting_checkbox*>(entry);
 
 			if (ImGui::Checkbox(checkbox->name.get(), &checkbox->value)) {
-				mod->dirty = true;
+				edited = true;
 			}
 
 			if (!checkbox->desc.empty()) {
@@ -315,7 +306,7 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 			}
 
 			if (changed) {
-				mod->dirty = true;
+				edited = true;
 			}
 
 			if (!slider->desc.empty()) {
@@ -331,7 +322,7 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 
 			ImGui::SetNextItemWidth(width);
 			if (ImGui::InputText(textbox->name.get(), &textbox->value)) {
-				mod->dirty = true;
+				edited = true;
 			}
 
 			if (!textbox->desc.empty()) {
@@ -360,7 +351,7 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 					if (ImGui::Selectable(cstrings[i], is_selected)) {
 						selected = i;
 						dropdown->value = selected;
-						mod->dirty = true;
+						edited = true;
 					}
 
 					if (is_selected) {
@@ -399,13 +390,18 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 		ImGui::PopItemFlag();
 		ImGui::PopStyleColor();
 	}
+	if (edited) {
+		ini_dirty_mods.insert(mod);
+	}
 	ImGui::PopID();
 }
 
 void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 {
+	ImGui::PushID(&entries);
+	bool edited = false;
+	// button to add a new entry
 	if (edit_mode) {
-		// button to add entry
 		if (ImGui::Button("+")) {
 			// correct popup position
 			ImGui::SetNextWindowPos(ImGui::GetCursorScreenPos());
@@ -416,14 +412,14 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				setting_checkbox* checkbox = new setting_checkbox();
 				checkbox->editing = true;
 				entries.push_back(checkbox);
-				mod->json_dirty = true;
+				edited = true;
 				INFO("added entry");
 			}
 			if (ImGui::Selectable("Slider")) {
 				setting_slider* slider = new setting_slider();
 				slider->editing = true;
 				entries.push_back(slider);
-				mod->json_dirty = true;
+				edited = true;
 				INFO("added entry");
 
 			}
@@ -431,7 +427,7 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				setting_textbox* textbox = new setting_textbox();
 				textbox->editing = true;
 				entries.push_back(textbox);
-				mod->json_dirty = true;
+				edited = true;
 				INFO("added entry");
 
 			}
@@ -442,7 +438,7 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				dropdown->options.push_back("Option 1");
 				dropdown->options.push_back("Option 2");
 				entries.push_back(dropdown);
-				mod->json_dirty = true;
+				edited = true;
 				INFO("added entry");
 
 			}
@@ -450,7 +446,7 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				Entry_text* text = new Entry_text();
 				text->editing = true;
 				entries.push_back(text);
-				mod->json_dirty = true;
+				edited = true;
 				INFO("added entry");
 
 			}
@@ -458,7 +454,7 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				Entry_group* group = new Entry_group();
 				group->editing = true;
 				entries.push_back(group);
-				mod->json_dirty = true;
+				edited = true;
 				INFO("added entry");
 
 			}
@@ -480,7 +476,6 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 		if (edit_mode) {
 			//ImGui::ToggleButton("Edit", &setting_ptr->editing);
 			if (ImGui::Button("Edit")) {  // Get the size of the current window
-
 				ImGui::OpenPopup("Edit Setting");
 				ImVec2 windowSize = ImGui::GetWindowSize();
 				// Set the size of the pop-up to be proportional to the window size
@@ -495,22 +490,7 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 
 			// up/down the entry
 			ImGui::SameLine();
-			if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
-				if (entry != entries.front()) {
-					auto it = std::find(entries.begin(), entries.end(), entry);
-					std::iter_swap(it, it - 1);
-					mod->json_dirty = true;
-				}
-			}
-			ImGui::SameLine();
-			if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
-				if (entry != entries.back()) {
-					auto it = std::find(entries.begin(), entries.end(), entry);
-					std::iter_swap(it, it + 1);
-					mod->json_dirty = true;
-				}
-			}
-			ImGui::SameLine();
+
 			// delete  button
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
 			if (ImGui::Button("Delete")) {
@@ -522,23 +502,47 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				}
 				it = entries.erase(it);
 				it--;
-				mod->json_dirty = true;
+				edited = true;
 				delete entry;
 				// TODO: delete everything in a group if deleting group.
 				continue;
 			}
 			ImGui::PopStyleColor();
-
 			ImGui::SameLine();
 		}
 
+		if (edit_mode) {
+			static std::vector<Entry*>* dragging_entry;
+			int i = std::distance(entries.begin(), it);
+			ImGui::Button("drag me!");
+			if (ImGui::BeginDragDropSource()) {
+				dragging_entry = &entries;
+				ImGui::SetDragDropPayload("ITEM", &i, sizeof(int));
+				ImGui::Text("dragging");
+				ImGui::EndDragDropSource();
+			}
+			if (ImGui::BeginDragDropTarget()) {
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ITEM")) {
+					int payload_n = *(const int*)payload->Data;
+					if (payload_n != i && &entries == dragging_entry) {
+						std::swap(entries[payload_n], entries[i]);
+					}
+				}
+				ImGui::EndDragDropTarget();
+			}
+		}
 		show_entry(entry, mod);
+
 
 		ImGui::PopStyleColor();
 
 		ImGui::Unindent();
 		ImGui::PopID();
 	}
+	if (edited) {
+		json_dirty_mods.insert(mod);
+	}
+	ImGui::PopID();
 }
 
 
@@ -558,7 +562,7 @@ void ModSettings::show_modSetting(mod_setting* mod)
 
 
 
-inline std::string ModSettings::getEntryStr(entry_type t)
+inline std::string ModSettings::get_type_str(entry_type t)
 {
 	switch (t) {
 	case entry_type::kEntryType_Checkbox:
@@ -582,7 +586,9 @@ void ModSettings::show()
 {
 	show_saveButton();
 	if (edit_mode) {
+		ImGui::SameLine();
 		show_saveJsonButton();
+		ImGui::SameLine();
 		show_reloadTranslationButton();
 	}
 	// a button on the rhs of this same line
@@ -616,16 +622,14 @@ void ModSettings::init()
 	// Read serialized settings from the .ini file for each mod
 	for (auto& mod : mods) {
 		load_ini(mod);
-		//insert_game_setting(mod);
-		//save_game_setting(mod);
+		insert_game_setting(mod);
+		flush_game_setting(mod);
 	}
 	INFO("Mod settings initialized");
 }
 
 ModSettings::Entry* ModSettings::load_json_non_group(nlohmann::json& json)
 {
-	INFO("Loading json {}", json["text"]["name"].get<std::string>());
-
 	Entry* e = nullptr;
 	std::string type_str = json["type"].get<std::string>();
 	if (type_str == "checkbox") {
@@ -669,6 +673,7 @@ ModSettings::Entry* ModSettings::load_json_non_group(nlohmann::json& json)
 		e = et;
 	} else {
 		INFO("Unknown setting type: {}", type_str);
+		return nullptr;
 	}
 	
 	if (e->is_setting()) {
@@ -685,41 +690,51 @@ ModSettings::Entry* ModSettings::load_json_non_group(nlohmann::json& json)
 
 ModSettings::Entry_group* ModSettings::load_json_group(nlohmann::json& group_json)
 {
-	INFO("Loading group json {}", group_json["text"]["name"].get<std::string>());
 	Entry_group* group = new Entry_group();
 	for (auto& entry_json : group_json["entries"]) {
-		Entry* entry = nullptr;
-
-		if (entry_json["type"].get<std::string>() == "group") {
-			entry = load_json_group(entry_json);
-		} else {
-			entry = load_json_non_group(entry_json);
+		Entry* entry = load_json_entry(entry_json);
+		if (entry) {
+			group->entries.push_back(entry);
 		}
-
-		entry->name.def = entry_json["text"]["name"].get<std::string>();
-		entry->desc.def = entry_json["text"]["desc"].get<std::string>();
-
-		if (entry_json.contains("translation")) {
-			if (entry_json["translation"].contains("name")) {
-				entry->name.key = entry_json["translation"]["name"].get<std::string>();
-			}
-			if (entry_json["translation"].contains("desc")) {
-				entry->desc.key = entry_json["translation"]["desc"].get<std::string>();
-			}
-		}
-
-		if (entry_json.contains("control")) {
-			if (entry_json["control"].contains("need")) {
-				for (auto& r : entry_json["control"]["need"]) {
-					std::string id = r.get<std::string>();
-					entry->req.push_back(id);
-				}
-			}
-		}
-		INFO("adding {}", entry->name.def);
-		group->entries.push_back(entry);
 	}
 	return group;
+}
+
+ModSettings::Entry* ModSettings::load_json_entry(nlohmann::json& entry_json)
+{
+	ModSettings::Entry* entry = nullptr;
+	if (entry_json["type"].get<std::string>() == "group") {
+		entry = load_json_group(entry_json);
+	} else {
+		entry = load_json_non_group(entry_json);
+	}
+	if (entry == nullptr) {
+		INFO("ERROR: Failed to load json entry.");
+		return nullptr;
+	}
+
+	entry->name.def = entry_json["text"]["name"].get<std::string>();
+	entry->desc.def = entry_json["text"]["desc"].get<std::string>();
+
+	if (entry_json.contains("translation")) {
+		if (entry_json["translation"].contains("name")) {
+			entry->name.key = entry_json["translation"]["name"].get<std::string>();
+		}
+		if (entry_json["translation"].contains("desc")) {
+			entry->desc.key = entry_json["translation"]["desc"].get<std::string>();
+		}
+	}
+
+	if (entry_json.contains("control")) {
+		if (entry_json["control"].contains("need")) {
+			for (auto& r : entry_json["control"]["need"]) {
+				std::string id = r.get<std::string>();
+				entry->req.push_back(id);
+			}
+		}
+	}
+	
+	return entry;
 }
 
 void ModSettings::load_json(std::filesystem::path path)
@@ -756,37 +771,10 @@ void ModSettings::load_json(std::filesystem::path path)
 		}
 
 		for (auto& entry_json : mod_json["data"]) {
-			Entry* entry = nullptr;
-
-			if (entry_json["type"].get<std::string>() ==  "group") {
-				entry = load_json_group(entry_json);
-			} else {
-				entry = load_json_non_group(entry_json);
+			Entry* entry = load_json_entry(entry_json);
+			if (entry) {
+				mod->entries.push_back(entry);
 			}
-			
-			entry->name.def = entry_json["text"]["name"].get<std::string>();
-			if (entry_json["text"].contains("desc")) {
-				entry->desc.def = entry_json["text"]["desc"].get<std::string>();
-			}
-
-			if (entry_json.contains("translation")) {
-				if (entry_json["translation"].contains("name")) {
-					entry->name.key = entry_json["translation"]["name"].get<std::string>();
-				}
-				if (entry_json["translation"].contains("desc")) {
-					entry->desc.key = entry_json["translation"]["desc"].get<std::string>();
-				}
-			}
-			
-			if (entry_json.contains("control")) {
-				if (entry_json["control"].contains("need")) {
-					for (auto& r : entry_json["control"]["need"]) {
-						std::string id = r.get<std::string>();
-						entry->req.push_back(id);
-					}
-				}
-			}
-			mod->entries.push_back(entry);
 		}
 		// Add the mod to the list of mods
 		mods.push_back(mod);
@@ -800,10 +788,8 @@ void ModSettings::load_json(std::filesystem::path path)
 
 void ModSettings::populate_non_group_json(Entry* entry, nlohmann::json& json)
 {
-	std::string type_str = "";
 	if (!entry->is_setting()) {
 		if (entry->type == entry_type::kEntryType_Text) {
-			type_str = "text";
 			json["style"]["color"]["r"] = dynamic_cast<Entry_text*>(entry)->_color.x;
 			json["style"]["color"]["g"] = dynamic_cast<Entry_text*>(entry)->_color.y;
 			json["style"]["color"]["b"] = dynamic_cast<Entry_text*>(entry)->_color.z;
@@ -824,20 +810,17 @@ void ModSettings::populate_non_group_json(Entry* entry, nlohmann::json& json)
 		if (cb_setting->control_id != "") {
 			json["control"]["id"] = cb_setting->control_id;
 		}
-		type_str = "checkbox";
 	} else if (setting->type == entry_type::kEntryType_Slider) {
 		auto slider_setting = dynamic_cast<setting_slider*>(entry);
 		json["default"] = slider_setting->default_value;
 		json["style"]["min"] = slider_setting->min;
 		json["style"]["max"] = slider_setting->max;
 		json["style"]["step"] = slider_setting->step;
-		type_str = "slider";
 
 	} else if (setting->type == entry_type::kEntryType_Textbox) {
 		auto textbox_setting = dynamic_cast<setting_textbox*>(entry);
 		json["default"] = textbox_setting->default_value;
 		json["size"] = textbox_setting->buf_size;
-		type_str = "textbox";
 
 	} else if (setting->type == entry_type::kEntryType_Dropdown) {
 		auto dropdown_setting = dynamic_cast<setting_dropdown*>(entry);
@@ -845,33 +828,34 @@ void ModSettings::populate_non_group_json(Entry* entry, nlohmann::json& json)
 		for (auto& option : dropdown_setting->options) {
 			json["options"].push_back(option);
 		}
-		type_str = "dropdown";
 	}
-	json["type"] = type_str;
 	
 }
 
-
 void ModSettings::populate_group_json(Entry_group* group, nlohmann::json& json)
 {
-	json["type"] = "group";
 	for (auto& entry : group->entries) {
 		nlohmann::json entry_json;
-		// common fields for entry
-		entry_json["text"]["name"] = entry->name.def;
-		entry_json["text"]["desc"] = entry->desc.def;
-		entry_json["translation"]["name"] = entry->name.key;
-		entry_json["translation"]["desc"] = entry->desc.key;
-		if (entry->is_group()) {
-			populate_group_json(dynamic_cast<Entry_group*>(entry), entry_json);
-		} else {
-			populate_non_group_json(entry, entry_json);
-		}
-		json["entries"].push_back(entry_json);
+		populate_entry_json(entry, entry_json);
+		json["entries"].push_back(json);
+	}
+}
+void ModSettings::populate_entry_json(Entry* entry, nlohmann::json& entry_json)
+{
+	// common fields for entry
+	entry_json["text"]["name"] = entry->name.def;
+	entry_json["text"]["desc"] = entry->desc.def;
+	entry_json["translation"]["name"] = entry->name.key;
+	entry_json["translation"]["desc"] = entry->desc.key;
+	entry_json["type"] = get_type_str(entry->type);
+	if (entry->is_group()) {
+		populate_group_json(dynamic_cast<Entry_group*>(entry), entry_json);
+	} else {
+		populate_non_group_json(entry, entry_json);
 	}
 }
 /* Serialize config to .json*/
-void ModSettings::save_mod_config(mod_setting* mod)
+void ModSettings::flush_json(mod_setting* mod)
 {
 	nlohmann::json mod_json;
 	mod_json["name"] = mod->name;
@@ -881,16 +865,7 @@ void ModSettings::save_mod_config(mod_setting* mod)
 
 	for (auto& entry : mod->entries) {
 		nlohmann:json entry_json;
-		entry_json["text"]["name"] = entry->name.def;
-		entry_json["text"]["desc"] = entry->desc.def;
-		entry_json["translation"]["name"] = entry->name.key;
-		entry_json["translation"]["desc"] = entry->desc.key;
-
-		if (entry->is_group()) {
-			populate_group_json(dynamic_cast<Entry_group*>(entry), entry_json);
-		} else {
-			populate_non_group_json(entry, entry_json);
-		}
+		populate_entry_json(entry, entry_json);
 		data_json.push_back(entry_json);
 	}
 	
@@ -912,7 +887,7 @@ void ModSettings::save_mod_config(mod_setting* mod)
 	}
 
 	insert_game_setting(mod);
-	save_game_setting(mod);
+	flush_game_setting(mod);
 
 	INFO("Saved config for {}", mod->name);
 }
@@ -952,7 +927,7 @@ void ModSettings::load_ini(mod_setting* mod)
 	if (rc != SI_OK) {
 		// Handle error loading file
 		INFO(".ini file for {} not found. Creating a new .ini file.", mod->name);
-		save_ini(mod);
+		flush_ini(mod);
 		return;
 	}
 
@@ -970,7 +945,7 @@ void ModSettings::load_ini(mod_setting* mod)
 			value = ini.GetValue(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str(), "");
 		} else {
 			INFO(".ini file for {} has no value for {}. Creating a new .ini file.", mod->name, setting_ptr->name.get());
-			save_ini(mod);
+			flush_ini(mod);
 			return;
 		}
 		// Convert the value to the appropriate type and assign it to the setting
@@ -990,7 +965,7 @@ void ModSettings::load_ini(mod_setting* mod)
 
 
 /* Flush changes to MOD into its .ini file*/
-void ModSettings::save_ini(mod_setting* mod)
+void ModSettings::flush_ini(mod_setting* mod)
 {
 	// Create a SimpleIni object to write to the ini file
 	CSimpleIniA ini;
@@ -1025,7 +1000,7 @@ void ModSettings::save_ini(mod_setting* mod)
 
 
 /* Flush changes to MOD's settings to game settings.*/
-void ModSettings::save_game_setting(mod_setting* mod)
+void ModSettings::flush_game_setting(mod_setting* mod)
 {
 	std::vector<ModSettings::setting_base*> settings;
 	get_all_settings(mod, settings);
@@ -1099,7 +1074,7 @@ void ModSettings::insert_game_setting(mod_setting* mod)
 void ModSettings::save_all_game_setting()
 {
 	for (auto mod : mods) {
-		save_game_setting(mod);
+		flush_game_setting(mod);
 	}
 }
 

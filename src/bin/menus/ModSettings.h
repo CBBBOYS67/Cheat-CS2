@@ -18,7 +18,7 @@ public:
 		kSettingType_Invalid
 	};
 
-	static std::string getEntryStr(entry_type t);
+	static std::string get_type_str(entry_type t);
 
 	class Entry
 	{
@@ -150,8 +150,6 @@ public:
 	public:
 		std::string name;
 		std::vector<Entry*> entries;
-		bool dirty;
-		bool json_dirty;
 		std::string ini_path;
 		std::string json_path;
 
@@ -160,6 +158,9 @@ public:
 
 	/* Settings of all mods*/
 	static inline std::vector<mod_setting*> mods;
+	
+	static inline std::unordered_set<mod_setting*> json_dirty_mods;  // mods whose changes need to be flushed to .json file. i.e. author has changed its setting
+	static inline std::unordered_set<mod_setting*> ini_dirty_mods;   // mods whose changes need to be flushed to .ini or gamesetting. i.e.  user has changed its setting
 
 public:
 
@@ -174,19 +175,22 @@ public:
 	/* Read everything in group_json and populate entries*/
 	static Entry* load_json_non_group(nlohmann::json& json);
 	static Entry_group* load_json_group(nlohmann::json& group_json);
+	static Entry* load_json_entry(nlohmann::json& json);
 	static void load_json(std::filesystem::path a_path);
 	
 	static void populate_non_group_json(Entry* group, nlohmann::json& group_json);
 	static void populate_group_json(Entry_group* group, nlohmann::json& group_json);
-	static void save_mod_config(mod_setting* mod);
+	static void populate_entry_json(Entry* entry, nlohmann::json& entry_json);
+
+	static void flush_json(mod_setting* mod);
 	
 	static void get_all_settings(mod_setting* mod, std::vector<ModSettings::setting_base*>& r_vec);
 
 
 	static void load_ini(mod_setting* mod);
-	static void save_ini(mod_setting* mod);
+	static void flush_ini(mod_setting* mod);
 	
-	static void save_game_setting(mod_setting* mod);
+	static void flush_game_setting(mod_setting* mod);
 
 	static void insert_game_setting(mod_setting* mod);
 

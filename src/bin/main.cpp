@@ -9,7 +9,7 @@ void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
 	case SKSE::MessagingInterface::kDataLoaded:
 		RE::BSInputDeviceManager::GetSingleton()->AddEventSink(InputListener::GetSingleton());
 		Hooks::Install();
-		ModSettings::save_all_game_setting();  // in case some .esp overwrite the game setting
+		ModSettings::save_all_game_setting();  // in case some .esp overwrite the game setting // fixme
 		break;
 	case SKSE::MessagingInterface::kPostLoad:
 		break;
