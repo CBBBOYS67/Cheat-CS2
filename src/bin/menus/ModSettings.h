@@ -2,8 +2,11 @@
 #include <unordered_set>
 #include "Translator.h"
 #include "imgui.h"
+#include "nlohmann/json.hpp"
+
 class ModSettings
 {
+public:
 	enum entry_type
 	{
 		kEntryType_Checkbox,
@@ -41,7 +44,7 @@ class ModSettings
 			name = Translatable("New Text");
 			_color = ImVec4(1, 1, 1, 1);
 		}
-		bool is_group() const override { return true; }
+
 	};
 
 
@@ -55,6 +58,8 @@ class ModSettings
 			type = kEntryType_Group;
 			name = Translatable("New Group");
 		}
+
+		bool is_group() const override { return true; }
 	};
 
 	
@@ -165,21 +170,24 @@ public:
 	
 	private:
 	/* Load a single mod from .json file*/
+		
+	/* Read everything in group_json and populate entries*/
+	static Entry* load_json_non_group(nlohmann::json& json);
+	static Entry_group* load_json_group(nlohmann::json& group_json);
 	static void load_json(std::filesystem::path a_path);
 	
 	static void populate_non_group_json(Entry* group, nlohmann::json& group_json);
 	static void populate_group_json(Entry_group* group, nlohmann::json& group_json);
 	static void save_mod_config(mod_setting* mod);
 	
+	static void get_all_settings(mod_setting* mod, std::vector<ModSettings::setting_base*>& r_vec);
+
+
 	static void load_ini(mod_setting* mod);
 	static void save_ini(mod_setting* mod);
 	
-	static void save_game_setting(setting_base* mod);
-	static void save_game_setting(Entry_group* mod);
 	static void save_game_setting(mod_setting* mod);
 
-	static void insert_game_setting(setting_base* base);
-	static void insert_game_setting(Entry_group* group);
 	static void insert_game_setting(mod_setting* mod);
 
 public:
@@ -193,9 +201,12 @@ private:
 	static void show_reloadTranslationButton();
 	static void show_saveButton();
 	static void show_saveJsonButton();
+
+	
 	static void show_modSetting(mod_setting* mod);
 	static void show_entry_edit(Entry* base, mod_setting* mod);
 	static void show_entry(Entry* base, mod_setting* mod);
+	static void show_entries(std::vector<Entry*>& entries, mod_setting* mod);
 
 	static inline std::unordered_map<std::string, setting_checkbox*> m_controls;
 
