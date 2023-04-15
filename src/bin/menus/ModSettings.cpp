@@ -38,6 +38,7 @@ void ModSettings::show_saveButton()
 				callback();
 			}
 		}
+		ini_dirty_mods.clear();
     }
 
     if (unsaved_changes) {
@@ -59,6 +60,7 @@ void ModSettings::show_saveJsonButton()
 		for (auto& mod : json_dirty_mods) {
 			flush_json(mod);
 		}
+		json_dirty_mods.clear();
 	}
 
 	if (unsaved_changes) {
@@ -74,11 +76,10 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 	bool edited = false;
 
 	// Show input fields to edit the setting name and ini id
-	if (ImGui::InputTextRequired("Name", &entry->name.def, ImGuiInputTextFlags_AutoSelectAll))
+	if (ImGui::InputTextWithPasteRequired("Name", entry->name.def))
 		edited = true;
-	if (ImGui::InputText("Description", &entry->desc.def, ImGuiInputTextFlags_AutoSelectAll))
+	if (ImGui::InputTextWithPaste("Description", entry->desc.def, ImVec2(ImGui::GetCurrentWindow()->Size.x * 0.8, ImGui::GetTextLineHeight() * 3), true, ImGuiInputTextFlags_AutoSelectAll))
 		edited = true;
-
 	int current_type = entry->type;
 
 	// Show fields specific to the selected setting type
@@ -90,8 +91,8 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 				edited = true;
 			}
 			std::string old_control_id = checkbox->control_id;
-			if (ImGui::InputText("Control ID", &checkbox->control_id)) { // on change of control id
-				if (!old_control_id.empty()) {  // remove old control id
+			if (ImGui::InputTextWithPaste("Control ID", checkbox->control_id)) {  // on change of control id
+				if (!old_control_id.empty()) {                            // remove old control id
 					m_controls.erase(old_control_id);
 				}
 				if (!checkbox->control_id.empty()) {
@@ -104,7 +105,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 	case kEntryType_Slider:
 		{
 			setting_slider* slider = dynamic_cast<setting_slider*>(entry);
-			if (ImGui::InputFloat("Default", &slider->default_value)) 
+			if (ImGui::InputFloat("Default", &slider->default_value))
 				edited = true;
 			if (ImGui::InputFloat("Min", &slider->min))
 				edited = true;
@@ -117,7 +118,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 	case kEntryType_Textbox:
 		{
 			setting_textbox* textbox = dynamic_cast<setting_textbox*>(entry);
-			if (ImGui::InputText("Default", &textbox->default_value))
+			if (ImGui::InputTextWithPaste("Default", textbox->default_value))
 				edited = true;
 			if (ImGui::InputInt("Size", &textbox->buf_size))
 				edited = true;
@@ -127,7 +128,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 		{
 			setting_dropdown* dropdown = dynamic_cast<setting_dropdown*>(entry);
 			ImGui::Text("Dropdown options");
-			ImGui::BeginChild("##dropdown_items", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize);
+			ImGui::BeginChild("##dropdown_items", ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
 			{
 				int buf;
 				if (ImGui::InputInt("Default", &buf, 0, 100)) {
@@ -140,12 +141,17 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 				}
 				for (int i = 0; i < dropdown->options.size(); i++) {
 					ImGui::PushID(i);
-					if (ImGui::InputText("Option", &dropdown->options[i])) edited = true;
+					if (ImGui::InputText("Option", &dropdown->options[i]))
+						edited = true;
 					ImGui::SameLine();
 					if (ImGui::Button("-")) {
 						dropdown->options.erase(dropdown->options.begin() + i);
+						if (dropdown->value == i) {  // erased current value
+							dropdown->value = 0;     // reset to 1st value
+						}
 						edited = true;
 					}
+
 					ImGui::PopID();
 				}
 			}
@@ -153,7 +159,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 			break;
 		}
 	case kEntryType_Text:
-		{	
+		{
 			// color palette to set text color
 			ImGui::Text("Text color");
 			ImGui::BeginChild("##text_color", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize);
@@ -174,14 +180,14 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 
 	ImGui::Text("Control");
 	ImGui::BeginChild("##control_requirements", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize);
-	
+
 	if (ImGui::Button("Add")) {
 		entry->req.emplace_back();
 		edited = true;
 	}
 	for (int i = 0; i < entry->req.size(); i++) {
 		ImGui::PushID(i);
-		if (ImGui::InputText("Option", &entry->req[i]))
+		if (ImGui::InputTextWithPaste("Option", entry->req[i]))
 			edited = true;
 		ImGui::SameLine();
 		if (ImGui::Button("-")) {
@@ -191,28 +197,27 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 		ImGui::PopID();
 	}
 	ImGui::EndChild();
-	
-	
+
 	ImGui::Text("Localization");
-	if (ImGui::BeginChild((std::string(entry->name.def) + "##Localization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize)) {
-		if (ImGui::InputText("Name", &entry->name.key, ImGuiInputTextFlags_AutoSelectAll))
+	if (ImGui::BeginChild((std::string(entry->name.def) + "##Localization").c_str(), ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize)) {
+		if (ImGui::InputTextWithPaste("Name", entry->name.key))
 			edited = true;
-		if (ImGui::InputText("Description", &entry->desc.key, ImGuiInputTextFlags_AutoSelectAll))
+		if (ImGui::InputTextWithPaste("Description", entry->desc.key))
 			edited = true;
 		ImGui::EndChild();
 	}
-	
+
 	if (entry->is_setting()) {
 		setting_base* setting = dynamic_cast<setting_base*>(entry);
 		ImGui::Text("Serialization");
-		if (ImGui::BeginChild((std::string(setting->name.def) + "##serialization").c_str(), ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize)) {
-			if (ImGui::InputTextRequired("ini ID", &setting->ini_id))
+		if (ImGui::BeginChild((std::string(setting->name.def) + "##serialization").c_str(), ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize)) {
+			if (ImGui::InputTextWithPasteRequired("ini ID", setting->ini_id))
 				edited = true;
 
-			if (ImGui::InputTextRequired("ini Section", &setting->ini_section))
+			if (ImGui::InputTextWithPasteRequired("ini Section", setting->ini_section))
 				edited = true;
 
-			if (ImGui::InputText("Game Setting", &setting->gameSetting)) {
+			if (ImGui::InputTextWithPaste("Game Setting", setting->gameSetting)) {
 				edited = true;
 			}
 			if (setting->type == kEntryType_Slider) {
@@ -231,15 +236,14 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 			ImGui::EndChild();
 		}
 	}
-
 	if (edited) {
 		json_dirty_mods.insert(mod);
 	}
-	
-	
 	//ImGui::EndChild();
 	ImGui::PopID();
 }
+
+
 
 void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 {
@@ -271,43 +275,49 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 			if (ImGui::Checkbox(checkbox->name.get(), &checkbox->value)) {
 				edited = true;
 			}
+			if (ImGui::IsItemHovered()) {
+				if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+					edited |= checkbox->reset();
+				}
+			}
 
 			if (!checkbox->desc.empty()) {
 				ImGui::SameLine();
 				ImGui::HoverNote(checkbox->desc.get());
 			}
+
 		}
 		break;
 
 	case kEntryType_Slider:
 		{
 			setting_slider* slider = dynamic_cast<setting_slider*>(entry);
-			bool changed = false;
 
 			// Set the width of the slider to a fraction of the available width
 			ImGui::SetNextItemWidth(width);
 			if (ImGui::SliderFloatWithSteps(slider->name.get(), &slider->value, slider->min, slider->max, slider->step)) {
-				changed = true;
+				edited = true;
 			}
 
 			if (ImGui::IsItemHovered()) {
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_LeftArrow))) {
 					if (slider->value > slider->min) {
 						slider->value -= slider->step;
-						changed = true;
+						edited = true;
 					}
 				}
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_RightArrow))) {
 					if (slider->value < slider->max) {
 						slider->value += slider->step;
-						changed = true;
+						edited = true;
 					}
+				}
+
+				if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+					edited |= slider->reset();
 				}
 			}
 
-			if (changed) {
-				edited = true;
-			}
 
 			if (!slider->desc.empty()) {
 				ImGui::SameLine();
@@ -329,6 +339,14 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 				ImGui::SameLine();
 				ImGui::HoverNote(textbox->desc.get());
 			}
+
+			if (ImGui::IsItemHovered()) {
+				if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+					edited |= textbox->reset();
+
+				}
+			}
+			
 		}
 		break;
 
@@ -343,8 +361,12 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 			for (auto& option : options) {
 				cstrings.push_back(option.c_str());
 			}
+			const char* preview_value = "";
+			if (selected >= 0 && selected < options.size()) {
+				preview_value = cstrings[selected];
+			}
 			ImGui::SetNextItemWidth(width);
-			if (ImGui::BeginCombo(name, cstrings[selected])) {
+			if (ImGui::BeginCombo(name, preview_value)) {
 				for (int i = 0; i < options.size(); i++) {
 					bool is_selected = (selected == i);
 
@@ -362,6 +384,12 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 				ImGui::EndCombo();
 			}
 
+			if (ImGui::IsItemHovered()) {
+				if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+					edited |= dropdown->reset();
+				}
+			}
+
 			if (!dropdown->desc.empty()) {
 				ImGui::SameLine();
 				ImGui::HoverNote(dropdown->desc.get());
@@ -377,8 +405,15 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 	case kEntryType_Group:
 		{
 			Entry_group* g = dynamic_cast<Entry_group*>(entry);
-			if (ImGui::CollapsingHeader(entry->name.get())) {
+			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+			if (ImGui::CollapsingHeader(g->name.get())) {
+				if (ImGui::IsItemHovered() && !g->desc.empty()) {
+					ImGui::SetTooltip(g->desc.get());
+				}
+				ImGui::PopStyleColor();
 				show_entries(g->entries, mod);
+			} else {
+				ImGui::PopStyleColor();
 			}
 		}
 		break;
@@ -400,9 +435,94 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 {
 	ImGui::PushID(&entries);
 	bool edited = false;
-	// button to add a new entry
+
+	
+	for (auto it = entries.begin(); it != entries.end(); it++) {
+		ModSettings::Entry* entry = *it;
+
+		ImGui::PushID(entry);
+
+		ImGui::Indent();
+		// edit entry
+		if (edit_mode) {
+			if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
+				if (it != entries.begin()) {
+					std::iter_swap(it, it - 1);
+					edited = true;
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
+				if (it != entries.end() - 1) {
+					std::iter_swap(it, it + 1);
+					edited = true;
+				}
+			}
+			ImGui::SameLine();
+
+			if (ImGui::Button("Edit")) {  // Get the size of the current window
+				ImGui::OpenPopup("Edit Setting");
+				ImVec2 windowSize = ImGui::GetWindowSize();
+				// Set the size of the pop-up to be proportional to the window size
+				ImVec2 popupSize(windowSize.x * 0.5f, windowSize.y * 0.5f);
+				ImGui::SetNextWindowSize(popupSize);
+			}
+			if (ImGui::BeginPopup("Edit Setting", ImGuiWindowFlags_AlwaysAutoResize)) {
+				// Get the size of the current window
+				show_entry_edit(entry, mod);
+				ImGui::EndPopup();
+			}
+
+			
+			ImGui::SameLine();
+
+			// delete  button
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+			if (ImGui::Button("Delete")) {
+				// delete entry
+				ImGui::OpenPopup("Delete Confirmation");
+				// move popup mousepos
+				ImVec2 mousePos = ImGui::GetMousePos();
+				ImGui::SetNextWindowPos(mousePos);
+			}
+			if (ImGui::BeginPopupModal("Delete Confirmation", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+				ImGui::Text("Are you sure you want to delete this setting?");
+				ImGui::Separator();
+
+				if (ImGui::Button("Yes", ImVec2(120, 0))) {
+					if (entry->type == entry_type::kEntryType_Checkbox) {
+						setting_checkbox* checkbox = (setting_checkbox*)entry;
+						m_controls.erase(checkbox->control_id);
+					}
+					it = entries.erase(it);
+					it--;
+					edited = true;
+					delete entry;
+					// TODO: delete everything in a group if deleting group.
+					ImGui::CloseCurrentPopup();
+					continue;
+				}
+				ImGui::SetItemDefaultFocus();
+				ImGui::SameLine();
+				if (ImGui::Button("No", ImVec2(120, 0))) {
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::EndPopup();
+			}
+			ImGui::PopStyleColor();
+			ImGui::SameLine();
+
+		}
+
+		show_entry(entry, mod);
+
+		ImGui::Unindent();
+		ImGui::PopID();
+	}
+
+		// add entry
 	if (edit_mode) {
-		if (ImGui::Button("+")) {
+		if (ImGui::Button("New Entry")) {
 			// correct popup position
 			ImGui::SetNextWindowPos(ImGui::GetCursorScreenPos());
 			ImGui::OpenPopup("Add Entry");
@@ -421,7 +541,6 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				entries.push_back(slider);
 				edited = true;
 				INFO("added entry");
-
 			}
 			if (ImGui::Selectable("Textbox")) {
 				setting_textbox* textbox = new setting_textbox();
@@ -429,7 +548,6 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				entries.push_back(textbox);
 				edited = true;
 				INFO("added entry");
-
 			}
 			if (ImGui::Selectable("Dropdown")) {
 				setting_dropdown* dropdown = new setting_dropdown();
@@ -440,7 +558,6 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				entries.push_back(dropdown);
 				edited = true;
 				INFO("added entry");
-
 			}
 			if (ImGui::Selectable("Text")) {
 				Entry_text* text = new Entry_text();
@@ -448,7 +565,6 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				entries.push_back(text);
 				edited = true;
 				INFO("added entry");
-
 			}
 			if (ImGui::Selectable("Group")) {
 				Entry_group* group = new Entry_group();
@@ -456,88 +572,10 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				entries.push_back(group);
 				edited = true;
 				INFO("added entry");
-
 			}
 
 			ImGui::EndPopup();
 		}
-	}
-	
-	for (auto it = entries.begin(); it != entries.end(); it++) {
-		ModSettings::Entry* entry = *it;
-
-		ImGui::PushID(entry);
-
-		ImGui::Indent();
-		// Set collapsing header background color to transparent
-		ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-
-		// Add edit button next to the entry
-		if (edit_mode) {
-			//ImGui::ToggleButton("Edit", &setting_ptr->editing);
-			if (ImGui::Button("Edit")) {  // Get the size of the current window
-				ImGui::OpenPopup("Edit Setting");
-				ImVec2 windowSize = ImGui::GetWindowSize();
-				// Set the size of the pop-up to be proportional to the window size
-				ImVec2 popupSize(windowSize.x * 0.5f, windowSize.y * 0.5f);
-				ImGui::SetNextWindowSize(popupSize);
-			}
-			if (ImGui::BeginPopup("Edit Setting")) {
-				// Get the size of the current window
-				show_entry_edit(entry, mod);
-				ImGui::EndPopup();
-			}
-
-			// up/down the entry
-			ImGui::SameLine();
-
-			// delete  button
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
-			if (ImGui::Button("Delete")) {
-				// delete entry
-				
-				if (entry->type == entry_type::kEntryType_Checkbox) {
-					setting_checkbox* checkbox = (setting_checkbox*)entry;
-					m_controls.erase(checkbox->control_id);
-				}
-				it = entries.erase(it);
-				it--;
-				edited = true;
-				delete entry;
-				// TODO: delete everything in a group if deleting group.
-				continue;
-			}
-			ImGui::PopStyleColor();
-			ImGui::SameLine();
-		}
-
-		if (edit_mode) {
-			static std::vector<Entry*>* dragging_entry;
-			int i = std::distance(entries.begin(), it);
-			ImGui::Button("drag me!");
-			if (ImGui::BeginDragDropSource()) {
-				dragging_entry = &entries;
-				ImGui::SetDragDropPayload("ITEM", &i, sizeof(int));
-				ImGui::Text("dragging");
-				ImGui::EndDragDropSource();
-			}
-			if (ImGui::BeginDragDropTarget()) {
-				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ITEM")) {
-					int payload_n = *(const int*)payload->Data;
-					if (payload_n != i && &entries == dragging_entry) {
-						std::swap(entries[payload_n], entries[i]);
-					}
-				}
-				ImGui::EndDragDropTarget();
-			}
-		}
-		show_entry(entry, mod);
-
-
-		ImGui::PopStyleColor();
-
-		ImGui::Unindent();
-		ImGui::PopID();
 	}
 	if (edited) {
 		json_dirty_mods.insert(mod);
@@ -714,7 +752,9 @@ ModSettings::Entry* ModSettings::load_json_entry(nlohmann::json& entry_json)
 	}
 
 	entry->name.def = entry_json["text"]["name"].get<std::string>();
-	entry->desc.def = entry_json["text"]["desc"].get<std::string>();
+	if (entry_json["text"].contains("desc")) {
+		entry->desc.def = entry_json["text"]["desc"].get<std::string>();
+	}
 
 	if (entry_json.contains("translation")) {
 		if (entry_json["translation"].contains("name")) {
@@ -726,8 +766,8 @@ ModSettings::Entry* ModSettings::load_json_entry(nlohmann::json& entry_json)
 	}
 
 	if (entry_json.contains("control")) {
-		if (entry_json["control"].contains("need")) {
-			for (auto& r : entry_json["control"]["need"]) {
+		if (entry_json["control"].contains("req")) {
+			for (auto& r : entry_json["control"]["req"]) {
 				std::string id = r.get<std::string>();
 				entry->req.push_back(id);
 			}
@@ -832,12 +872,12 @@ void ModSettings::populate_non_group_json(Entry* entry, nlohmann::json& json)
 	
 }
 
-void ModSettings::populate_group_json(Entry_group* group, nlohmann::json& json)
+void ModSettings::populate_group_json(Entry_group* group, nlohmann::json& group_json)
 {
 	for (auto& entry : group->entries) {
 		nlohmann::json entry_json;
 		populate_entry_json(entry, entry_json);
-		json["entries"].push_back(json);
+		group_json["entries"].push_back(entry_json);
 	}
 }
 void ModSettings::populate_entry_json(Entry* entry, nlohmann::json& entry_json)
@@ -848,6 +888,11 @@ void ModSettings::populate_entry_json(Entry* entry, nlohmann::json& entry_json)
 	entry_json["translation"]["name"] = entry->name.key;
 	entry_json["translation"]["desc"] = entry->desc.key;
 	entry_json["type"] = get_type_str(entry->type);
+	if (!entry->req.empty()) {
+		for (auto n : entry->req) {
+			entry_json["control"]["req"].push_back(n);
+		}
+	}
 	if (entry->is_group()) {
 		populate_group_json(dynamic_cast<Entry_group*>(entry), entry_json);
 	} else {

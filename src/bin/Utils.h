@@ -84,5 +84,7 @@ namespace ImGui
 	bool ToggleButton(const char* str_id, bool* v);
 
 	bool InputTextRequired(const char* label, std::string* str, ImGuiInputTextFlags flags = 0);
+	bool InputTextWithPaste(const char* label, std::string& text, const ImVec2& size = ImVec2(0, 0), bool multiline = false, ImGuiInputTextFlags flags = 0);
+	bool InputTextWithPasteRequired(const char* label, std::string& text, const ImVec2& size = ImVec2(0, 0), bool multiline = false, ImGuiInputTextFlags flags = 0);
 
 }

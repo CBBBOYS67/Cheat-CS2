@@ -257,4 +257,108 @@ namespace ImGui
 		return ret;
 	}
 
+// Callback function to handle resizing the std::string buffer
+	static int InputTextCallback(ImGuiInputTextCallbackData* data)
+	{
+		std::string* str = static_cast<std::string*>(data->UserData);
+		if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+			str->resize(data->BufTextLen);
+			data->Buf = &(*str)[0];
+		}
+		return 0;
+	}
+
+	
+	bool InputTextWithPaste(const char* label, std::string& text, const ImVec2& size, bool multiline, ImGuiInputTextFlags flags)
+	{
+		ImGui::PushID(&text);
+		// Add the ImGuiInputTextFlags_CallbackResize flag to allow resizing the std::string buffer
+		flags |= ImGuiInputTextFlags_CallbackResize;
+	
+		// Call the InputTextWithCallback function with the std::string buffer and callback function
+		bool result;
+		if (multiline) {
+			result = ImGui::InputTextMultiline(label, &text[0], text.capacity()+1, size, flags, InputTextCallback, &text);
+
+		} else {
+			result = ImGui::InputText(label, &text[0], text.capacity() + 1, flags, InputTextCallback, &text);
+		}
+		
+		// Check if the InputText is hovered and the right mouse button is clicked
+		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
+			// Set the context menu to be shown
+			ImGui::OpenPopup("InputTextContextMenu");
+		}
+
+		// Display the context menu
+		if (ImGui::BeginPopup("InputTextContextMenu")) {
+			if (ImGui::MenuItem("Copy")) {
+				// Copy the selected text to the clipboard
+				const char* selected_text = text.c_str();
+				if (selected_text) {
+					ImGui::SetClipboardText(selected_text);
+				}
+			}
+			if (ImGui::MenuItem("Paste")) {
+				// Read the clipboard content
+				const char* clipboard = ImGui::GetClipboardText();
+
+				if (clipboard) {
+					// Insert the clipboard content into the text buffer
+					text.append(clipboard);
+				}
+			}
+			ImGui::EndPopup();
+		}
+		ImGui::PopID();
+		return result;
+	}
+
+	bool InputTextWithPasteRequired(const char* label, std::string& text, const ImVec2& size, bool multiline, ImGuiInputTextFlags flags)
+	{
+		ImGui::PushID(&text);
+		// Add the ImGuiInputTextFlags_CallbackResize flag to allow resizing the std::string buffer
+		flags |= ImGuiInputTextFlags_CallbackResize;
+
+		// Call the InputTextWithCallback function with the std::string buffer and callback function
+		bool empty = text.empty();
+		if (empty) {
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(1.0f, 0.0f, 0.0f, 0.2f));
+			ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0f, 0.0f, 0.0f, 0.2f));
+			ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 0.0f, 0.0f, 0.2f));
+		}
+		bool result;
+		if (multiline) {
+			result = ImGui::InputTextMultiline(label, &text[0], text.capacity() + 1, size, flags, InputTextCallback, &text);
+
+		} else {
+
+			result = ImGui::InputText(label, &text[0], text.capacity() + 1, flags, InputTextCallback, &text);
+		}
+		if (empty) {
+			ImGui::PopStyleColor(3);
+		}
+
+		// Check if the InputText is hovered and the right mouse button is clicked
+		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
+			// Set the context menu to be shown
+			ImGui::OpenPopup("InputTextContextMenu");
+		}
+
+		// Display the context menu
+		if (ImGui::BeginPopup("InputTextContextMenu")) {
+			if (ImGui::MenuItem("Paste")) {
+				// Read the clipboard content
+				const char* clipboard = ImGui::GetClipboardText();
+
+				if (clipboard) {
+					// Insert the clipboard content into the text buffer
+					text.append(clipboard);
+				}
+			}
+			ImGui::EndPopup();
+		}
+		ImGui::PopID();
+		return result;
+	}
 }

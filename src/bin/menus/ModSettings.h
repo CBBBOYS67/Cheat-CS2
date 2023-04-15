@@ -74,6 +74,7 @@ public:
 		std::string gameSetting;
 		bool is_setting() const override { return true; }
 		virtual ~setting_base() = default;
+		virtual bool reset() { return false; };
 	};
 
 	class setting_checkbox : public setting_base
@@ -89,7 +90,12 @@ public:
 		bool value;
 		bool default_value;
 		std::string control_id;
-
+		bool reset() override
+		{
+			bool changed = value != default_value;
+			value = default_value;
+			return changed;
+		}
 	};
 
 	class setting_slider : public setting_base
@@ -111,6 +117,12 @@ public:
 		float step;
 		float default_value;
 		uint8_t precision = 2;  // number of decimal places
+		bool reset() override
+		{
+			bool changed = value != default_value;
+			value = default_value;
+			return changed;
+		}
 	};
 	
 	class setting_textbox : public setting_base
@@ -127,6 +139,12 @@ public:
 			value = "";
 			default_value = "";
 		}
+		bool reset() override 
+		{ 
+			bool changed = value != default_value;
+			value = default_value;
+			return changed;
+		}
 	};
 
 	class setting_dropdown : public setting_base
@@ -142,6 +160,12 @@ public:
 		std::vector<std::string> options;
 		int value;  // index into options
 		int default_value;
+		bool reset() override
+		{
+			bool changed = value != default_value;
+			value = default_value;
+			return changed;
+		}
 	};
 
 	/* Settings of one mod, represented by one .json file and serialized to one .ini file.*/
