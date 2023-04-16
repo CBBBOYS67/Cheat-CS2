@@ -88,6 +88,11 @@ namespace UI
 		//ImGui::SameLine(ImGui::GetWindowWidth() - 100);
 		ImGui::Checkbox("Lock Pos", &Settings::lockWindowPos);
 		//ImGui::PopStyleVar();
+
+		if (ImGui::SliderFloat("Font Size", &Settings::fontScale, 0.5f, 2.f)) {
+			ImGui::GetIO().FontGlobalScale = Settings::fontScale;
+		}
+		ImGui::SameLine();
 	}
 }
 

@@ -347,6 +347,13 @@ namespace ImGui
 
 		// Display the context menu
 		if (ImGui::BeginPopup("InputTextContextMenu")) {
+			if (ImGui::MenuItem("Copy")) {
+				// Copy the selected text to the clipboard
+				const char* selected_text = text.c_str();
+				if (selected_text) {
+					ImGui::SetClipboardText(selected_text);
+				}
+			}
 			if (ImGui::MenuItem("Paste")) {
 				// Read the clipboard content
 				const char* clipboard = ImGui::GetClipboardText();

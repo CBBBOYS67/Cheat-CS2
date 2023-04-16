@@ -6,7 +6,15 @@
 
 class ModSettings
 {
+	class setting_base;
+	class setting_checkbox;
+	class setting_slider;
+	
+	// checkboxs' control key -> checkbox
+	static inline std::unordered_map<std::string, setting_checkbox*> m_checkbox_toggle;
+
 public:
+	
 	enum entry_type
 	{
 		kEntryType_Checkbox,
@@ -22,12 +30,43 @@ public:
 
 	class Entry
 	{
+		
 	public:
+		class Control
+		{
+		public:
+			class Req
+			{
+			public:
+				enum ReqType
+				{
+					kReqType_Checkbox,
+					kReqType_GameSetting
+				};
+				ReqType type;
+				std::string id;
+				bool _not = false;  // the requirement needs to be off for satisfied() to return true
+				bool satisfied();
+				Req()
+				{
+					id = "New Requirement";
+					type = kReqType_Checkbox;
+				}
+			};
+			enum FailAction
+			{
+				kFailAction_Disable,
+				kFailAction_Hide,
+			};
+			FailAction failAction;
+			std::vector<Req> reqs;
+			bool satisfied();
+		};
+
 		entry_type type;
 		Translatable name;
 		Translatable desc;
-		std::vector<std::string> req;
-		bool editing = false;
+		Control control;
 		virtual bool is_setting() const { return false; }
 		virtual ~Entry() = default;
 		virtual bool is_group() const { return false; }
@@ -63,8 +102,6 @@ public:
 	};
 
 	
-	class setting_checkbox;
-
 	class setting_base : public Entry
 	{
 	public:
@@ -235,8 +272,9 @@ private:
 	static void show_entry_edit(Entry* base, mod_setting* mod);
 	static void show_entry(Entry* base, mod_setting* mod);
 	static void show_entries(std::vector<Entry*>& entries, mod_setting* mod);
+	
 
-	static inline std::unordered_map<std::string, setting_checkbox*> m_controls;
+	
 
 	static inline bool edit_mode = false;
 };

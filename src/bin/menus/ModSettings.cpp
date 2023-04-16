@@ -10,6 +10,39 @@
 
 #include "bin/Utils.h"
 #include "Settings.h"
+inline bool ModSettings::Entry::Control::Req::satisfied()
+{
+	bool val = false;
+	if (type == kReqType_Checkbox) {
+		auto it = ModSettings::m_checkbox_toggle.find(id);
+		if (it == ModSettings::m_checkbox_toggle.end()) {
+			return false;
+		}
+		val = it->second->value;
+	} else if (type == kReqType_GameSetting) {
+		auto gsc = RE::GameSettingCollection::GetSingleton();
+		if (!gsc) {
+			return false;
+		}
+		auto setting = gsc->GetSetting(id.c_str());
+		if (!setting) {
+			return false;
+		}
+		val = setting->GetBool();
+	}
+	return this->_not ? !val : val;
+}
+
+inline bool ModSettings::Entry::Control::satisfied()
+{
+	for (auto& req : reqs) {
+		if (!req.satisfied()) {
+			return false;
+		}
+	}
+	return true;
+}
+
 
 using json = nlohmann::json;
 
@@ -93,10 +126,10 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 			std::string old_control_id = checkbox->control_id;
 			if (ImGui::InputTextWithPaste("Control ID", checkbox->control_id)) {  // on change of control id
 				if (!old_control_id.empty()) {                            // remove old control id
-					m_controls.erase(old_control_id);
+					m_checkbox_toggle.erase(old_control_id);
 				}
 				if (!checkbox->control_id.empty()) {
-					m_controls[checkbox->control_id] = checkbox;  // update control id
+					m_checkbox_toggle[checkbox->control_id] = checkbox;  // update control id
 				}
 				edited = true;
 			}
@@ -179,24 +212,75 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 	}
 
 	ImGui::Text("Control");
-	ImGui::BeginChild("##control_requirements", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize);
-
+	// choose fail action
+	static const char* failActions[] = { "Disable", "Hide" };
+	if (ImGui::BeginCombo("Fail Action", failActions[(int)entry->control.failAction])) {
+		for (int i = 0; i < 2; i++) {
+			bool is_selected = ((int)entry->control.failAction == i);
+			if (ImGui::Selectable(failActions[i], is_selected))
+				entry->control.failAction = static_cast<Entry::Control::FailAction>(i);
+			if (is_selected)
+				ImGui::SetItemDefaultFocus();
+		}
+		ImGui::EndCombo();
+	}
 	if (ImGui::Button("Add")) {
-		entry->req.emplace_back();
+		entry->control.reqs.emplace_back();
 		edited = true;
 	}
-	for (int i = 0; i < entry->req.size(); i++) {
-		ImGui::PushID(i);
-		if (ImGui::InputTextWithPaste("Option", entry->req[i]))
-			edited = true;
-		ImGui::SameLine();
-		if (ImGui::Button("-")) {
-			entry->req.erase(entry->req.begin() + i);
-			edited = true;
+
+	if (ImGui::BeginChild("##control_requirements", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize)) {
+		// set the number of columns to 3
+
+
+		for (int i = 0; i < entry->control.reqs.size(); i++) {
+			auto& req = entry->control.reqs[i];  // get a reference to the requirement at index i
+			ImGui::PushID(&req);
+			const int numColumns = 3;
+			ImGui::Columns(numColumns, nullptr, false);
+			// set the width of each column to be the same
+			ImGui::SetColumnWidth(0, ImGui::GetWindowWidth() * 0.33f);
+			ImGui::SetColumnWidth(1, ImGui::GetWindowWidth() * 0.33f);
+			ImGui::SetColumnWidth(2, ImGui::GetWindowWidth() * 0.33f);
+
+			if (ImGui::InputTextWithPaste("id", req.id)) {
+				edited = true;
+			}
+
+			// add the second column
+			ImGui::NextColumn();
+			static const char* reqTypes[] = { "Checkbox", "GameSetting" };
+			if (ImGui::BeginCombo("Type", reqTypes[(int)req.type])) {
+				for (int i = 0; i < 2; i++) {
+					bool is_selected = ((int)req.type == i);
+					if (ImGui::Selectable(reqTypes[i], is_selected))
+						req.type = static_cast<Entry::Control::Req::ReqType>(i);
+					if (is_selected)
+						ImGui::SetItemDefaultFocus();
+				}
+				ImGui::EndCombo();
+			}
+
+			// add the third column
+			ImGui::NextColumn();
+			if (ImGui::Checkbox("not", &req._not)) {
+				edited = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("-")) {
+				entry->control.reqs.erase(entry->control.reqs.begin() + i);  // erase the requirement at index i
+				edited = true;
+				i--;  // update the loop index to account for the erased element
+			}
+			ImGui::Columns(1);
+
+			ImGui::PopID();
 		}
-		ImGui::PopID();
+
+		ImGui::EndChild();
 	}
-	ImGui::EndChild();
+
+	
 
 	ImGui::Text("Localization");
 	if (ImGui::BeginChild((std::string(entry->name.def) + "##Localization").c_str(), ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -251,19 +335,17 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 	bool edited = false;
 	
 	// check if all control requirements are met
-	bool available = true;
-	for (auto& r : entry->req) {
-		if (m_controls.contains(r)) {
-			if (m_controls[r]->value == false) {
-				available = false;
-				break;
-			}
-		}
-	}
+	bool available = entry->control.satisfied();
 	if (!available) {
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+		switch (entry->control.failAction) {
+		case Entry::Control::FailAction::kFailAction_Hide:
+			ImGui::PopID();
+			return;
+		default:
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+		}
 	}
 		
 	float width = ImGui::GetContentRegionAvail().x * 0.5f;
@@ -420,7 +502,7 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 	default:
 		break;
 	}
-	if (!available) {
+	if (!available) { // disabled before
 		ImGui::PopStyleVar();
 		ImGui::PopItemFlag();
 		ImGui::PopStyleColor();
@@ -492,7 +574,7 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				if (ImGui::Button("Yes", ImVec2(120, 0))) {
 					if (entry->type == entry_type::kEntryType_Checkbox) {
 						setting_checkbox* checkbox = (setting_checkbox*)entry;
-						m_controls.erase(checkbox->control_id);
+						m_checkbox_toggle.erase(checkbox->control_id);
 					}
 					it = entries.erase(it);
 					it--;
@@ -530,28 +612,24 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 		if (ImGui::BeginPopup("Add Entry")) {
 			if (ImGui::Selectable("Checkbox")) {
 				setting_checkbox* checkbox = new setting_checkbox();
-				checkbox->editing = true;
 				entries.push_back(checkbox);
 				edited = true;
 				INFO("added entry");
 			}
 			if (ImGui::Selectable("Slider")) {
 				setting_slider* slider = new setting_slider();
-				slider->editing = true;
 				entries.push_back(slider);
 				edited = true;
 				INFO("added entry");
 			}
 			if (ImGui::Selectable("Textbox")) {
 				setting_textbox* textbox = new setting_textbox();
-				textbox->editing = true;
 				entries.push_back(textbox);
 				edited = true;
 				INFO("added entry");
 			}
 			if (ImGui::Selectable("Dropdown")) {
 				setting_dropdown* dropdown = new setting_dropdown();
-				dropdown->editing = true;
 				dropdown->options.push_back("Option 0");
 				dropdown->options.push_back("Option 1");
 				dropdown->options.push_back("Option 2");
@@ -561,14 +639,12 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 			}
 			if (ImGui::Selectable("Text")) {
 				Entry_text* text = new Entry_text();
-				text->editing = true;
 				entries.push_back(text);
 				edited = true;
 				INFO("added entry");
 			}
 			if (ImGui::Selectable("Group")) {
 				Entry_group* group = new Entry_group();
-				group->editing = true;
 				entries.push_back(group);
 				edited = true;
 				INFO("added entry");
@@ -677,7 +753,7 @@ ModSettings::Entry* ModSettings::load_json_non_group(nlohmann::json& json)
 		if (json.contains("control")) {
 			if (json["control"].contains("id")) {
 				scb->control_id = json["control"]["id"].get<std::string>();
-				m_controls[scb->control_id] = scb;
+				m_checkbox_toggle[scb->control_id] = scb;
 			}
 		}
 		e = scb;
@@ -764,12 +840,33 @@ ModSettings::Entry* ModSettings::load_json_entry(nlohmann::json& entry_json)
 			entry->desc.key = entry_json["translation"]["desc"].get<std::string>();
 		}
 	}
+	entry->control.failAction = Entry::Control::kFailAction_Disable;
 
 	if (entry_json.contains("control")) {
-		if (entry_json["control"].contains("req")) {
-			for (auto& r : entry_json["control"]["req"]) {
-				std::string id = r.get<std::string>();
-				entry->req.push_back(id);
+		if (entry_json["control"].contains("requirements")) {
+			for (auto& req_json : entry_json["control"]["requirements"]) {
+				Entry::Control::Req req;
+				req.id = req_json["id"].get<std::string>();
+				req._not = !req_json["value"].get<bool>();
+				std::string req_type = req_json["type"].get<std::string>();
+				if (req_type == "checkbox") {
+					req.type = Entry::Control::Req::ReqType::kReqType_Checkbox;
+				} else if (req_type == "gameSetting") {
+					req.type = Entry::Control::Req::ReqType::kReqType_GameSetting;
+				}
+				else {
+					INFO("Error: unknown requirement type: {}", req_type);
+					continue;
+				}
+				entry->control.reqs.push_back(req);
+			}
+		}
+		if (entry_json["control"].contains("failAction")) {
+			std::string failAction = entry_json["control"]["failAction"].get<std::string>();
+			if (failAction == "disable") {
+				entry->control.failAction = Entry::Control::kFailAction_Disable;
+			} else if (failAction == "hide") {
+				entry->control.failAction = Entry::Control::kFailAction_Hide;
 			}
 		}
 	}
@@ -795,7 +892,6 @@ void ModSettings::load_json(std::filesystem::path path)
 		// Handle error parsing JSON
 		return;
 	}
-
 	// Create a mod_setting object to hold the settings for this mod
 	mod_setting* mod = new mod_setting();
 
@@ -888,11 +984,40 @@ void ModSettings::populate_entry_json(Entry* entry, nlohmann::json& entry_json)
 	entry_json["translation"]["name"] = entry->name.key;
 	entry_json["translation"]["desc"] = entry->desc.key;
 	entry_json["type"] = get_type_str(entry->type);
-	if (!entry->req.empty()) {
-		for (auto n : entry->req) {
-			entry_json["control"]["req"].push_back(n);
+
+	auto control_json = entry_json["control"];
+
+	for (auto& req : entry->control.reqs) {
+		nlohmann::json req_json;
+		std::string req_type = "";
+		switch (req.type) {
+		case Entry::Control::Req::kReqType_Checkbox:
+			req_type = "checkbox";
+			break;
+		case Entry::Control::Req::kReqType_GameSetting:
+			req_type = "gameSetting";
+			break;
+		default:
+			req_type = "ERRORTYPE";
+			break;
 		}
+		req_json["type"] = req_type;
+		req_json["value"] = !req._not;
+		req_json["id"] = req.id;
+		control_json["requirements"].push_back(req_json);
 	}
+	switch (entry->control.failAction) {
+	case Entry::Control::kFailAction_Disable:
+		control_json["failAction"] = "disable";
+		break;
+	case Entry::Control::kFailAction_Hide:
+		control_json["failAction"] = "hide";
+		break;
+	default:
+		control_json["failAction"] = "ERROR";
+		break;
+	}
+	entry_json["control"] = control_json;
 	if (entry->is_group()) {
 		populate_group_json(dynamic_cast<Entry_group*>(entry), entry_json);
 	} else {

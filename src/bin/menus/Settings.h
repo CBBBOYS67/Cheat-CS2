@@ -11,6 +11,8 @@ public:
 	static inline bool lockWindowPos = false;
 	static inline bool lockWindowSize = false;
 
+	static inline float fontScale = 1.f;
+
 	static inline Translator::Language currLanguage = Translator::Language::English;
 
 	static void show();
