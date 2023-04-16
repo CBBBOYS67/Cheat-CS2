@@ -239,9 +239,9 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 			const int numColumns = 3;
 			ImGui::Columns(numColumns, nullptr, false);
 			// set the width of each column to be the same
-			ImGui::SetColumnWidth(0, ImGui::GetWindowWidth() * 0.33f);
-			ImGui::SetColumnWidth(1, ImGui::GetWindowWidth() * 0.33f);
-			ImGui::SetColumnWidth(2, ImGui::GetWindowWidth() * 0.33f);
+			ImGui::SetColumnWidth(0, ImGui::GetWindowWidth() * 0.5f);
+			ImGui::SetColumnWidth(1, ImGui::GetWindowWidth() * 0.25f);
+			ImGui::SetColumnWidth(2, ImGui::GetWindowWidth() * 0.25f);
 
 			if (ImGui::InputTextWithPaste("id", req.id)) {
 				edited = true;
@@ -339,8 +339,10 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 	if (!available) {
 		switch (entry->control.failAction) {
 		case Entry::Control::FailAction::kFailAction_Hide:
-			ImGui::PopID();
-			return;
+			if (!edit_mode) { // use disable fail action under edit mode
+				ImGui::PopID();
+				return;
+			}
 		default:
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
 			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
@@ -1222,22 +1224,28 @@ void ModSettings::insert_game_setting(mod_setting* mod)
 		return;
 	}
 	for (auto& setting : settings) {
-		if (setting->gameSetting.empty()) {  // no gamesetting mapping
-			return;
+		// insert setting setting
+		if (!setting->gameSetting.empty()) {// gamesetting mapping
+			if (gsc->GetSetting(setting->gameSetting.data())) {  // setting already exists
+				return;
+			}
+			RE::Setting* s = new RE::Setting(setting->gameSetting.c_str());
+			gsc->InsertSetting(s);
+			if (!gsc->GetSetting(setting->gameSetting.c_str())) {
+				INFO("Failed to insert game setting.");
+				return;
+			}
 		}
-		if (gsc->GetSetting(setting->gameSetting.data())) {  // setting already exists
-			return;
+		// inject setting for setting's req
+		for (auto req : setting->control.reqs) {
+			if (req.type == Entry::Control::Req::kReqType_GameSetting) {
+				if (!gsc->GetSetting(req.id.c_str())) {
+					RE::Setting* s = new RE::Setting(req.id.c_str());
+					gsc->InsertSetting(s);
+				}
+			}
 		}
-		RE::Setting* s = new RE::Setting(setting->gameSetting.c_str());
-		if (!s) {
-			INFO("Failed to initialize setting when trying to insert game setting.");
-			return;
-		}
-		gsc->InsertSetting(s);
-		if (!gsc->GetSetting(setting->gameSetting.c_str())) {
-			INFO("Failed to insert game setting.");
-			return;
-		}
+		
 	}
 }
 
