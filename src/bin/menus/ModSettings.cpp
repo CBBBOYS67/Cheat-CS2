@@ -10,6 +10,7 @@
 
 #include "bin/Utils.h"
 #include "Settings.h"
+static RE::GameSettingCollection* gsc = nullptr;
 inline bool ModSettings::Entry::Control::Req::satisfied()
 {
 	bool val = false;
@@ -20,14 +21,14 @@ inline bool ModSettings::Entry::Control::Req::satisfied()
 		}
 		val = it->second->value;
 	} else if (type == kReqType_GameSetting) {
-		auto gsc = RE::GameSettingCollection::GetSingleton();
 		if (!gsc) {
-			return false;
+			gsc = RE::GameSettingCollection::GetSingleton();
+			if (!gsc)
+				return false;
 		}
 		auto setting = gsc->GetSetting(id.c_str());
-		if (!setting) {
+		if (!setting) 
 			return false;
-		}
 		val = setting->GetBool();
 	}
 	return this->_not ? !val : val;
@@ -70,6 +71,7 @@ void ModSettings::show_saveButton()
 			for (auto callback : mod->callbacks) {
 				callback();
 			}
+			SendSettingsUpdateEvent(mod->name);
 		}
 		ini_dirty_mods.clear();
     }
@@ -661,6 +663,18 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 	ImGui::PopID();
 }
 
+inline void ModSettings::SendSettingsUpdateEvent(std::string& modName)
+{
+	auto eventSource = SKSE::GetModCallbackEventSource();
+	if (!eventSource) {
+		return;
+	}
+	SKSE::ModCallbackEvent callbackEvent;
+	callbackEvent.eventName = "dmenu_updateSettings";
+	callbackEvent.strArg = modName;
+	eventSource->SendEvent(&callbackEvent);
+}
+
 
 
 void ModSettings::show_modSetting(mod_setting* mod)
@@ -1182,9 +1196,12 @@ void ModSettings::flush_game_setting(mod_setting* mod)
 		return;
 	}
 	for (auto& setting : settings) {
-		RE::Setting* s = gsc->GetSetting(setting->gameSetting.data());
+		if (setting->gameSetting.empty()) {
+			continue;
+		}
+		RE::Setting* s = gsc->GetSetting(setting->gameSetting.c_str());
 		if (!s) {
-			INFO("Error: Game setting not found when trying to save game setting.");
+			INFO("Error: Game setting not found when trying to save game setting {} for setting {}", setting->gameSetting, setting->name.def);
 			return;
 		}
 		if (setting->type == kEntryType_Checkbox) {
@@ -1226,7 +1243,7 @@ void ModSettings::insert_game_setting(mod_setting* mod)
 	for (auto& setting : settings) {
 		// insert setting setting
 		if (!setting->gameSetting.empty()) {// gamesetting mapping
-			if (gsc->GetSetting(setting->gameSetting.data())) {  // setting already exists
+			if (gsc->GetSetting(setting->gameSetting.c_str())) {  // setting already exists
 				return;
 			}
 			RE::Setting* s = new RE::Setting(setting->gameSetting.c_str());

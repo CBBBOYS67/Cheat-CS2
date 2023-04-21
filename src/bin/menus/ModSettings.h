@@ -273,7 +273,7 @@ private:
 	static void show_entry(Entry* base, mod_setting* mod);
 	static void show_entries(std::vector<Entry*>& entries, mod_setting* mod);
 	
-
+	static void SendSettingsUpdateEvent(std::string& modName);
 	
 
 	static inline bool edit_mode = false;
