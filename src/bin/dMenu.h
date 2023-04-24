@@ -12,6 +12,7 @@ public:
 	
 	static inline bool initialized = false;
 
+
 private:
 
 	// Define an enum to represent the different tabs

@@ -9,11 +9,14 @@ class ModSettings
 	class setting_base;
 	class setting_checkbox;
 	class setting_slider;
+	class setting_keymap;
 	
 	// checkboxs' control key -> checkbox
 	static inline std::unordered_map<std::string, setting_checkbox*> m_checkbox_toggle;
 
 public:
+	static inline setting_keymap* keyMapListening = nullptr;
+	static void submitInput(uint32_t id);
 	
 	enum entry_type
 	{
@@ -23,12 +26,13 @@ public:
 		kEntryType_Dropdown,
 		kEntryType_Text,
 		kEntryType_Group,
+		kEntryType_Keymap,
 		kSettingType_Invalid
 	};
 
 	static std::string get_type_str(entry_type t);
 
-	class Entry
+	class entry_base
 	{
 		
 	public:
@@ -68,16 +72,16 @@ public:
 		Translatable desc;
 		Control control;
 		virtual bool is_setting() const { return false; }
-		virtual ~Entry() = default;
+		virtual ~entry_base() = default;
 		virtual bool is_group() const { return false; }
 	};
 
-	class Entry_text : public Entry
+	class entry_text : public entry_base
 	{
 	public:
 		ImVec4 _color;
 
-		Entry_text()
+		entry_text()
 		{
 			type = kEntryType_Text;
 			name = Translatable("New Text");
@@ -87,12 +91,12 @@ public:
 	};
 
 
-	class Entry_group : public Entry
+	class entry_group : public entry_base
 	{
 	public:
-		std::vector<Entry*> entries;
+		std::vector<entry_base*> entries;
 		
-		Entry_group()
+		entry_group()
 		{
 			type = kEntryType_Group;
 			name = Translatable("New Group");
@@ -102,7 +106,7 @@ public:
 	};
 
 	
-	class setting_base : public Entry
+	class setting_base : public entry_base
 	{
 	public:
 		std::string ini_section;
@@ -167,7 +171,6 @@ public:
 	public:
 		std::string value;
 		char* buf;
-		int buf_size;
 		std::string default_value;
 		setting_textbox() 
 		{ 
@@ -205,12 +208,25 @@ public:
 		}
 	};
 
+	class setting_keymap : public setting_base
+	{
+	public:
+		setting_keymap() {
+			type = kEntryType_Keymap;
+			name = Translatable("New Keymap");
+			value = 0;
+			default_value = 0;
+		}
+		uint32_t value;
+		uint32_t default_value;
+	};
+
 	/* Settings of one mod, represented by one .json file and serialized to one .ini file.*/
 	class mod_setting
 	{
 	public:
 		std::string name;
-		std::vector<Entry*> entries;
+		std::vector<entry_base*> entries;
 		std::string ini_path;
 		std::string json_path;
 
@@ -234,18 +250,19 @@ public:
 	/* Load a single mod from .json file*/
 		
 	/* Read everything in group_json and populate entries*/
-	static Entry* load_json_non_group(nlohmann::json& json);
-	static Entry_group* load_json_group(nlohmann::json& group_json);
-	static Entry* load_json_entry(nlohmann::json& json);
+	static entry_base* load_json_non_group(nlohmann::json& json);
+	static entry_group* load_json_group(nlohmann::json& group_json);
+	static entry_base* load_json_entry(nlohmann::json& json);
 	static void load_json(std::filesystem::path a_path);
 	
-	static void populate_non_group_json(Entry* group, nlohmann::json& group_json);
-	static void populate_group_json(Entry_group* group, nlohmann::json& group_json);
-	static void populate_entry_json(Entry* entry, nlohmann::json& entry_json);
+	static void populate_non_group_json(entry_base* group, nlohmann::json& group_json);
+	static void populate_group_json(entry_group* group, nlohmann::json& group_json);
+	static void populate_entry_json(entry_base* entry, nlohmann::json& entry_json);
 
 	static void flush_json(mod_setting* mod);
 	
 	static void get_all_settings(mod_setting* mod, std::vector<ModSettings::setting_base*>& r_vec);
+	static void get_all_entries(mod_setting* mod, std::vector<ModSettings::entry_base*>& r_vec);
 
 
 	static void load_ini(mod_setting* mod);
@@ -269,9 +286,9 @@ private:
 
 	
 	static void show_modSetting(mod_setting* mod);
-	static void show_entry_edit(Entry* base, mod_setting* mod);
-	static void show_entry(Entry* base, mod_setting* mod);
-	static void show_entries(std::vector<Entry*>& entries, mod_setting* mod);
+	static void show_entry_edit(entry_base* base, mod_setting* mod);
+	static void show_entry(entry_base* base, mod_setting* mod);
+	static void show_entries(std::vector<entry_base*>& entries, mod_setting* mod);
 	
 	static void SendSettingsUpdateEvent(std::string& modName);
 	

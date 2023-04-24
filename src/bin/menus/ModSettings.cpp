@@ -11,7 +11,7 @@
 #include "bin/Utils.h"
 #include "Settings.h"
 static RE::GameSettingCollection* gsc = nullptr;
-inline bool ModSettings::Entry::Control::Req::satisfied()
+inline bool ModSettings::entry_base::Control::Req::satisfied()
 {
 	bool val = false;
 	if (type == kReqType_Checkbox) {
@@ -34,7 +34,7 @@ inline bool ModSettings::Entry::Control::Req::satisfied()
 	return this->_not ? !val : val;
 }
 
-inline bool ModSettings::Entry::Control::satisfied()
+inline bool ModSettings::entry_base::Control::satisfied()
 {
 	for (auto& req : reqs) {
 		if (!req.satisfied()) {
@@ -104,7 +104,7 @@ void ModSettings::show_saveJsonButton()
 }
 
 
-void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
+void ModSettings::show_entry_edit(entry_base* entry, mod_setting* mod)
 {
 	ImGui::PushID(entry);
 
@@ -155,8 +155,6 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 			setting_textbox* textbox = dynamic_cast<setting_textbox*>(entry);
 			if (ImGui::InputTextWithPaste("Default", textbox->default_value))
 				edited = true;
-			if (ImGui::InputInt("Size", &textbox->buf_size))
-				edited = true;
 			break;
 		}
 	case kEntryType_Dropdown:
@@ -199,7 +197,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 			ImGui::Text("Text color");
 			ImGui::BeginChild("##text_color", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize);
 			{
-				Entry_text* text = dynamic_cast<Entry_text*>(entry);
+				entry_text* text = dynamic_cast<entry_text*>(entry);
 				float colorArray[4] = { text->_color.x, text->_color.y, text->_color.z, text->_color.w };
 				if (ImGui::ColorEdit4("Color", colorArray)) {
 					text->_color = ImVec4(colorArray[0], colorArray[1], colorArray[2], colorArray[3]);
@@ -220,7 +218,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 		for (int i = 0; i < 2; i++) {
 			bool is_selected = ((int)entry->control.failAction == i);
 			if (ImGui::Selectable(failActions[i], is_selected))
-				entry->control.failAction = static_cast<Entry::Control::FailAction>(i);
+				entry->control.failAction = static_cast<entry_base::Control::FailAction>(i);
 			if (is_selected)
 				ImGui::SetItemDefaultFocus();
 		}
@@ -256,7 +254,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 				for (int i = 0; i < 2; i++) {
 					bool is_selected = ((int)req.type == i);
 					if (ImGui::Selectable(reqTypes[i], is_selected))
-						req.type = static_cast<Entry::Control::Req::ReqType>(i);
+						req.type = static_cast<entry_base::Control::Req::ReqType>(i);
 					if (is_selected)
 						ImGui::SetItemDefaultFocus();
 				}
@@ -331,7 +329,7 @@ void ModSettings::show_entry_edit(Entry* entry, mod_setting* mod)
 
 
 
-void ModSettings::show_entry(Entry* entry, mod_setting* mod)
+void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
 {
 	ImGui::PushID(entry);
 	bool edited = false;
@@ -340,7 +338,7 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 	bool available = entry->control.satisfied();
 	if (!available) {
 		switch (entry->control.failAction) {
-		case Entry::Control::FailAction::kFailAction_Hide:
+		case entry_base::Control::FailAction::kFailAction_Hide:
 			if (!edit_mode) { // use disable fail action under edit mode
 				ImGui::PopID();
 				return;
@@ -484,13 +482,13 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 		break;
 	case kEntryType_Text:
 		{
-			Entry_text* t = dynamic_cast<Entry_text*>(entry);
+			entry_text* t = dynamic_cast<entry_text*>(entry);
 			ImGui::TextColored(t->_color, t->name.get());
 		}
 		break;
 	case kEntryType_Group:
 		{
-			Entry_group* g = dynamic_cast<Entry_group*>(entry);
+			entry_group* g = dynamic_cast<entry_group*>(entry);
 			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
 			if (ImGui::CollapsingHeader(g->name.get())) {
 				if (ImGui::IsItemHovered() && !g->desc.empty()) {
@@ -503,6 +501,26 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 			}
 		}
 		break;
+	case kEntryType_Keymap:
+		{
+			setting_keymap* k = dynamic_cast<setting_keymap*>(entry);
+			ImGui::SetNextItemWidth(width);
+			ImGui::Text("%s", std::to_string(k->value));
+			ImGui::SameLine();
+			ImGui::Text("%s", k->name.get());
+			ImGui::SameLine();
+			if (ImGui::Button("Remap")) {
+				ImGui::BeginPopupModal("keymapPopUp");
+				keyMapListening = k;
+			}
+			if (ImGui::BeginPopup("keymapPopUp")) {
+				ImGui::Text("Enter the key you wish to map");
+				if (keyMapListening == nullptr) {
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::EndPopup();
+			}
+		}
 	default:
 		break;
 	}
@@ -517,14 +535,14 @@ void ModSettings::show_entry(Entry* entry, mod_setting* mod)
 	ImGui::PopID();
 }
 
-void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
+void ModSettings::show_entries(std::vector<entry_base*>& entries, mod_setting* mod)
 {
 	ImGui::PushID(&entries);
 	bool edited = false;
 
 	
 	for (auto it = entries.begin(); it != entries.end(); it++) {
-		ModSettings::Entry* entry = *it;
+		ModSettings::entry_base* entry = *it;
 
 		ImGui::PushID(entry);
 
@@ -641,14 +659,20 @@ void ModSettings::show_entries(std::vector<Entry*>& entries, mod_setting* mod)
 				edited = true;
 				INFO("added entry");
 			}
+			if (ImGui::Selectable("Keymap")) {
+				setting_keymap* keymap = new setting_keymap();
+				entries.push_back(keymap);
+				edited = true;
+				INFO("added entry");
+			}
 			if (ImGui::Selectable("Text")) {
-				Entry_text* text = new Entry_text();
+				entry_text* text = new entry_text();
 				entries.push_back(text);
 				edited = true;
 				INFO("added entry");
 			}
 			if (ImGui::Selectable("Group")) {
-				Entry_group* group = new Entry_group();
+				entry_group* group = new entry_group();
 				entries.push_back(group);
 				edited = true;
 				INFO("added entry");
@@ -691,6 +715,17 @@ void ModSettings::show_modSetting(mod_setting* mod)
 }
 
 
+
+void ModSettings::submitInput(uint32_t id)
+{
+	if (keyMapListening == nullptr) {
+		return;
+	}
+
+	
+	keyMapListening->value = id;
+	keyMapListening = nullptr;
+}
 
 inline std::string ModSettings::get_type_str(entry_type t)
 {
@@ -758,9 +793,9 @@ void ModSettings::init()
 	INFO("Mod settings initialized");
 }
 
-ModSettings::Entry* ModSettings::load_json_non_group(nlohmann::json& json)
+ModSettings::entry_base* ModSettings::load_json_non_group(nlohmann::json& json)
 {
-	Entry* e = nullptr;
+	entry_base* e = nullptr;
 	std::string type_str = json["type"].get<std::string>();
 	if (type_str == "checkbox") {
 		setting_checkbox* scb = new setting_checkbox();
@@ -796,7 +831,7 @@ ModSettings::Entry* ModSettings::load_json_non_group(nlohmann::json& json)
 		sdd->default_value = sdd->value;
 		e = sdd;
 	} else if (type_str == "text") {
-		Entry_text* et = new Entry_text();
+		entry_text* et = new entry_text();
 		if (json.contains("style") && json["style"].contains("color")) {
 			et->_color = ImVec4(json["style"]["color"]["r"].get<float>(), json["style"]["color"]["g"].get<float>(), json["style"]["color"]["b"].get<float>(), json["style"]["color"]["a"].get<float>());
 		}
@@ -818,11 +853,11 @@ ModSettings::Entry* ModSettings::load_json_non_group(nlohmann::json& json)
 
 }
 
-ModSettings::Entry_group* ModSettings::load_json_group(nlohmann::json& group_json)
+ModSettings::entry_group* ModSettings::load_json_group(nlohmann::json& group_json)
 {
-	Entry_group* group = new Entry_group();
+	entry_group* group = new entry_group();
 	for (auto& entry_json : group_json["entries"]) {
-		Entry* entry = load_json_entry(entry_json);
+		entry_base* entry = load_json_entry(entry_json);
 		if (entry) {
 			group->entries.push_back(entry);
 		}
@@ -830,9 +865,9 @@ ModSettings::Entry_group* ModSettings::load_json_group(nlohmann::json& group_jso
 	return group;
 }
 
-ModSettings::Entry* ModSettings::load_json_entry(nlohmann::json& entry_json)
+ModSettings::entry_base* ModSettings::load_json_entry(nlohmann::json& entry_json)
 {
-	ModSettings::Entry* entry = nullptr;
+	ModSettings::entry_base* entry = nullptr;
 	if (entry_json["type"].get<std::string>() == "group") {
 		entry = load_json_group(entry_json);
 	} else {
@@ -856,19 +891,19 @@ ModSettings::Entry* ModSettings::load_json_entry(nlohmann::json& entry_json)
 			entry->desc.key = entry_json["translation"]["desc"].get<std::string>();
 		}
 	}
-	entry->control.failAction = Entry::Control::kFailAction_Disable;
+	entry->control.failAction = entry_base::Control::kFailAction_Disable;
 
 	if (entry_json.contains("control")) {
 		if (entry_json["control"].contains("requirements")) {
 			for (auto& req_json : entry_json["control"]["requirements"]) {
-				Entry::Control::Req req;
+				entry_base::Control::Req req;
 				req.id = req_json["id"].get<std::string>();
 				req._not = !req_json["value"].get<bool>();
 				std::string req_type = req_json["type"].get<std::string>();
 				if (req_type == "checkbox") {
-					req.type = Entry::Control::Req::ReqType::kReqType_Checkbox;
+					req.type = entry_base::Control::Req::ReqType::kReqType_Checkbox;
 				} else if (req_type == "gameSetting") {
-					req.type = Entry::Control::Req::ReqType::kReqType_GameSetting;
+					req.type = entry_base::Control::Req::ReqType::kReqType_GameSetting;
 				}
 				else {
 					INFO("Error: unknown requirement type: {}", req_type);
@@ -880,9 +915,9 @@ ModSettings::Entry* ModSettings::load_json_entry(nlohmann::json& entry_json)
 		if (entry_json["control"].contains("failAction")) {
 			std::string failAction = entry_json["control"]["failAction"].get<std::string>();
 			if (failAction == "disable") {
-				entry->control.failAction = Entry::Control::kFailAction_Disable;
+				entry->control.failAction = entry_base::Control::kFailAction_Disable;
 			} else if (failAction == "hide") {
-				entry->control.failAction = Entry::Control::kFailAction_Hide;
+				entry->control.failAction = entry_base::Control::kFailAction_Hide;
 			}
 		}
 	}
@@ -923,7 +958,7 @@ void ModSettings::load_json(std::filesystem::path path)
 		}
 
 		for (auto& entry_json : mod_json["data"]) {
-			Entry* entry = load_json_entry(entry_json);
+			entry_base* entry = load_json_entry(entry_json);
 			if (entry) {
 				mod->entries.push_back(entry);
 			}
@@ -938,14 +973,14 @@ void ModSettings::load_json(std::filesystem::path path)
 	INFO("Loaded mod {}", mod->name);
 }
 
-void ModSettings::populate_non_group_json(Entry* entry, nlohmann::json& json)
+void ModSettings::populate_non_group_json(entry_base* entry, nlohmann::json& json)
 {
 	if (!entry->is_setting()) {
 		if (entry->type == entry_type::kEntryType_Text) {
-			json["style"]["color"]["r"] = dynamic_cast<Entry_text*>(entry)->_color.x;
-			json["style"]["color"]["g"] = dynamic_cast<Entry_text*>(entry)->_color.y;
-			json["style"]["color"]["b"] = dynamic_cast<Entry_text*>(entry)->_color.z;
-			json["style"]["color"]["a"] = dynamic_cast<Entry_text*>(entry)->_color.w;
+			json["style"]["color"]["r"] = dynamic_cast<entry_text*>(entry)->_color.x;
+			json["style"]["color"]["g"] = dynamic_cast<entry_text*>(entry)->_color.y;
+			json["style"]["color"]["b"] = dynamic_cast<entry_text*>(entry)->_color.z;
+			json["style"]["color"]["a"] = dynamic_cast<entry_text*>(entry)->_color.w;
 		}
 		return;  // no need to continue, the following fields are only for settings
 	}
@@ -972,7 +1007,6 @@ void ModSettings::populate_non_group_json(Entry* entry, nlohmann::json& json)
 	} else if (setting->type == entry_type::kEntryType_Textbox) {
 		auto textbox_setting = dynamic_cast<setting_textbox*>(entry);
 		json["default"] = textbox_setting->default_value;
-		json["size"] = textbox_setting->buf_size;
 
 	} else if (setting->type == entry_type::kEntryType_Dropdown) {
 		auto dropdown_setting = dynamic_cast<setting_dropdown*>(entry);
@@ -984,7 +1018,7 @@ void ModSettings::populate_non_group_json(Entry* entry, nlohmann::json& json)
 	
 }
 
-void ModSettings::populate_group_json(Entry_group* group, nlohmann::json& group_json)
+void ModSettings::populate_group_json(entry_group* group, nlohmann::json& group_json)
 {
 	for (auto& entry : group->entries) {
 		nlohmann::json entry_json;
@@ -992,7 +1026,7 @@ void ModSettings::populate_group_json(Entry_group* group, nlohmann::json& group_
 		group_json["entries"].push_back(entry_json);
 	}
 }
-void ModSettings::populate_entry_json(Entry* entry, nlohmann::json& entry_json)
+void ModSettings::populate_entry_json(entry_base* entry, nlohmann::json& entry_json)
 {
 	// common fields for entry
 	entry_json["text"]["name"] = entry->name.def;
@@ -1007,10 +1041,10 @@ void ModSettings::populate_entry_json(Entry* entry, nlohmann::json& entry_json)
 		nlohmann::json req_json;
 		std::string req_type = "";
 		switch (req.type) {
-		case Entry::Control::Req::kReqType_Checkbox:
+		case entry_base::Control::Req::kReqType_Checkbox:
 			req_type = "checkbox";
 			break;
-		case Entry::Control::Req::kReqType_GameSetting:
+		case entry_base::Control::Req::kReqType_GameSetting:
 			req_type = "gameSetting";
 			break;
 		default:
@@ -1023,10 +1057,10 @@ void ModSettings::populate_entry_json(Entry* entry, nlohmann::json& entry_json)
 		control_json["requirements"].push_back(req_json);
 	}
 	switch (entry->control.failAction) {
-	case Entry::Control::kFailAction_Disable:
+	case entry_base::Control::kFailAction_Disable:
 		control_json["failAction"] = "disable";
 		break;
-	case Entry::Control::kFailAction_Hide:
+	case entry_base::Control::kFailAction_Hide:
 		control_json["failAction"] = "hide";
 		break;
 	default:
@@ -1035,7 +1069,7 @@ void ModSettings::populate_entry_json(Entry* entry, nlohmann::json& entry_json)
 	}
 	entry_json["control"] = control_json;
 	if (entry->is_group()) {
-		populate_group_json(dynamic_cast<Entry_group*>(entry), entry_json);
+		populate_group_json(dynamic_cast<entry_group*>(entry), entry_json);
 	} else {
 		populate_non_group_json(entry, entry_json);
 	}
@@ -1080,10 +1114,10 @@ void ModSettings::flush_json(mod_setting* mod)
 
 void ModSettings::get_all_settings(mod_setting* mod, std::vector<ModSettings::setting_base*>& r_vec)
 {
-	std::stack<Entry_group*> group_stack;
+	std::stack<entry_group*> group_stack;
 	for (auto& entry : mod->entries) {
 		if (entry->is_group()) {
-			group_stack.push(dynamic_cast<Entry_group*>(entry));
+			group_stack.push(dynamic_cast<entry_group*>(entry));
 		} else if (entry->is_setting()) {
 			r_vec.push_back(dynamic_cast<setting_base*>(entry));
 		}
@@ -1093,10 +1127,31 @@ void ModSettings::get_all_settings(mod_setting* mod, std::vector<ModSettings::se
 		group_stack.pop();
 		for (auto& entry : group->entries) {
 			if (entry->is_group()) {
-				group_stack.push(dynamic_cast<Entry_group*>(entry));
+				group_stack.push(dynamic_cast<entry_group*>(entry));
 			} else if (entry->is_setting()) {
 				r_vec.push_back(dynamic_cast<setting_base*>(entry));
 			}
+		}
+	}
+}
+
+void ModSettings::get_all_entries(mod_setting* mod, std::vector<ModSettings::entry_base*>& r_vec)
+{
+	std::stack<entry_group*> group_stack;
+	for (auto& entry : mod->entries) {
+		if (entry->is_group()) {
+			group_stack.push(dynamic_cast<entry_group*>(entry));
+		}
+		r_vec.push_back(entry);
+	}
+	while (!group_stack.empty()) {  // get all groups
+		auto group = group_stack.top();
+		group_stack.pop();
+		for (auto& entry : group->entries) {
+			if (entry->is_group()) {
+				group_stack.push(dynamic_cast<entry_group*>(entry));
+			}
+			r_vec.push_back(entry);
 		}
 	}
 }
@@ -1233,36 +1288,38 @@ void ModSettings::flush_game_setting(mod_setting* mod)
 
 void ModSettings::insert_game_setting(mod_setting* mod) 
 {
-	std::vector<ModSettings::setting_base*> settings;
-	get_all_settings(mod, settings);
+	std::vector<ModSettings::entry_base*> entries;
+	get_all_entries(mod, entries); // must get all entries to inject settings for the entry's control requirements
 	auto gsc = RE::GameSettingCollection::GetSingleton();
 	if (!gsc) {
 		INFO("Game setting collection not found when trying to insert game setting.");
 		return;
 	}
-	for (auto& setting : settings) {
-		// insert setting setting
-		if (!setting->gameSetting.empty()) {// gamesetting mapping
-			if (gsc->GetSetting(setting->gameSetting.c_str())) {  // setting already exists
-				return;
-			}
-			RE::Setting* s = new RE::Setting(setting->gameSetting.c_str());
-			gsc->InsertSetting(s);
-			if (!gsc->GetSetting(setting->gameSetting.c_str())) {
-				INFO("Failed to insert game setting.");
-				return;
+	for (auto& entry : entries) {
+		if (entry->is_setting()) {
+			auto es = dynamic_cast<ModSettings::setting_base*>(entry);
+			// insert setting setting
+			if (!es->gameSetting.empty()) {                     // gamesetting mapping
+				if (gsc->GetSetting(es->gameSetting.c_str())) {  // setting already exists
+					return;
+				}
+				RE::Setting* s = new RE::Setting(es->gameSetting.c_str());
+				gsc->InsertSetting(s);
+				if (!gsc->GetSetting(es->gameSetting.c_str())) {
+					INFO("ERROR: Failed to insert game setting.");
+				}
 			}
 		}
+		
 		// inject setting for setting's req
-		for (auto req : setting->control.reqs) {
-			if (req.type == Entry::Control::Req::kReqType_GameSetting) {
+		for (auto req : entry->control.reqs) {
+			if (req.type == entry_base::Control::Req::kReqType_GameSetting) {
 				if (!gsc->GetSetting(req.id.c_str())) {
 					RE::Setting* s = new RE::Setting(req.id.c_str());
 					gsc->InsertSetting(s);
 				}
 			}
 		}
-		
 	}
 }
 

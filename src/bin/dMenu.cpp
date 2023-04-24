@@ -22,14 +22,11 @@ void DMenu::draw()
 	ImGui::Begin("dMenu", NULL, windowFlags);
 	
 	if (ImGui::BeginTabBar("TabBar", ImGuiTabBarFlags_FittingPolicyResizeDown)) {
-		bool tabSelected = false;
-		tabSelected = currentTab == Tab::Trainer;
 		if (ImGui::BeginTabItem("Trainer")) {
 			currentTab = Trainer;
 			Trainer::show();
 			ImGui::EndTabItem();
 		}
-		tabSelected = currentTab == Tab::AIM;
 		
 		if (ImGui::BeginTabItem("AIM")) {
 			currentTab = Tab::AIM;
@@ -37,14 +34,12 @@ void DMenu::draw()
 			ImGui::EndTabItem();
 		}
 		
-		tabSelected = currentTab == Tab::ModSettings;
 		if (ImGui::BeginTabItem("Mod Config")) {
 			currentTab = Tab::ModSettings;
 			ModSettings::show();
 			ImGui::EndTabItem();
 		}
 		
-		tabSelected = currentTab == Tab::Settings;
 		if (ImGui::BeginTabItem("Settings")) {
 			currentTab = Tab::Settings;
 			Settings::show();

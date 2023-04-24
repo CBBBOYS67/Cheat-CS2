@@ -8,6 +8,7 @@
 
 #include "Renderer.h"
 
+#include "menus/ModSettings.h"
 
 // enum : uint32_t
 // {
@@ -261,6 +262,76 @@ public:
 	uint32_t keyCode;  // 18 (ascii code)
 };
 
+
+static enum : std::uint32_t
+{
+	kInvalid = static_cast<std::uint32_t>(-1),
+	kKeyboardOffset = 0,
+	kMouseOffset = 256,
+	kGamepadOffset = 266
+};
+			
+static inline std::uint32_t GetGamepadIndex(RE::BSWin32GamepadDevice::Key a_key)
+{
+	using Key = RE::BSWin32GamepadDevice::Key;
+
+	std::uint32_t index;
+	switch (a_key) {
+	case Key::kUp:
+		index = 0;
+		break;
+	case Key::kDown:
+		index = 1;
+		break;
+	case Key::kLeft:
+		index = 2;
+		break;
+	case Key::kRight:
+		index = 3;
+		break;
+	case Key::kStart:
+		index = 4;
+		break;
+	case Key::kBack:
+		index = 5;
+		break;
+	case Key::kLeftThumb:
+		index = 6;
+		break;
+	case Key::kRightThumb:
+		index = 7;
+		break;
+	case Key::kLeftShoulder:
+		index = 8;
+		break;
+	case Key::kRightShoulder:
+		index = 9;
+		break;
+	case Key::kA:
+		index = 10;
+		break;
+	case Key::kB:
+		index = 11;
+		break;
+	case Key::kX:
+		index = 12;
+		break;
+	case Key::kY:
+		index = 13;
+		break;
+	case Key::kLeftTrigger:
+		index = 14;
+		break;
+	case Key::kRightTrigger:
+		index = 15;
+		break;
+	default:
+		index = kInvalid;
+		break;
+	}
+
+	return index != kInvalid ? index + kGamepadOffset : kInvalid;
+}
 RE::BSEventNotifyControl InputListener::ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>* a_eventSource)
 {
 	if (!a_event || !a_eventSource)
@@ -277,6 +348,25 @@ RE::BSEventNotifyControl InputListener::ProcessEvent(RE::InputEvent* const* a_ev
 				continue;
 
 			auto scan_code = button->GetIDCode();
+
+			using DeviceType = RE::INPUT_DEVICE;
+			auto input = scan_code;
+			switch (button->device.get()) {
+			case DeviceType::kMouse:
+				input += kMouseOffset;
+				break;
+			case DeviceType::kKeyboard:
+				input += kKeyboardOffset;
+				break;
+			case DeviceType::kGamepad:
+				input = GetGamepadIndex((RE::BSWin32GamepadDevice::Key)input);
+				break;
+			default:
+				continue;
+			}
+			ModSettings::submitInput(input);
+
+			
 			uint32_t key = MapVirtualKeyEx(scan_code, MAPVK_VSC_TO_VK_EX, GetKeyboardLayout(0));
 			switch (scan_code) {
 			case DIK_LEFTARROW:
