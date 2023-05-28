@@ -207,6 +207,22 @@ void ModSettings::show_entry_edit(entry_base* entry, mod_setting* mod)
 			}
 			break;
 		}
+	case kEntryType_Color:
+	{
+			// color palette to set text color
+			ImGui::Text("Color");
+			ImGui::BeginChild("##color", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize);
+			{
+				setting_color* color = dynamic_cast<setting_color*>(entry);
+				float colorArray[4] = { color->default_color.x, color->default_color.y, color->default_color.z, color->default_color.w };
+				if (ImGui::ColorEdit4("Default Color", colorArray)) {
+					color->default_color = ImVec4(colorArray[0], colorArray[1], colorArray[2], colorArray[3]);
+					edited = true;
+				}
+				ImGui::EndChild();
+			}
+			break;
+	}
 	default:
 		break;
 	}
@@ -521,6 +537,22 @@ void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
 				ImGui::EndPopup();
 			}
 		}
+	case kEntryType_Color:
+		{
+			setting_color* c = dynamic_cast<setting_color*>(entry);
+			ImGui::SetNextItemWidth(width);
+			setting_color* color = dynamic_cast<setting_color*>(entry);
+			float colorArray[4] = { color->color.x, color->color.y, color->color.z, color->color.w };
+			if (ImGui::ColorEdit4(color->name.get(), colorArray)) {
+				color->color = ImVec4(colorArray[0], colorArray[1], colorArray[2], colorArray[3]);
+				edited = true;
+			}
+			if (ImGui::IsItemHovered()) {
+				if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+					edited |= color->reset();
+				}
+			}
+		}
 	default:
 		break;
 	}
@@ -677,6 +709,12 @@ void ModSettings::show_entries(std::vector<entry_base*>& entries, mod_setting* m
 				edited = true;
 				INFO("added entry");
 			}
+			if (ImGui::Selectable("Color")) {
+				setting_color* color = new setting_color();
+				entries.push_back(color);
+				edited = true;
+				INFO("added entry");
+			}
 
 			ImGui::EndPopup();
 		}
@@ -742,6 +780,8 @@ inline std::string ModSettings::get_type_str(entry_type t)
 		return "text";
 	case entry_type::kEntryType_Group:
 		return "group";
+	case entry_type::kEntryType_Color:
+		return "color";
 	default:
 		return "invalid";
 	}
@@ -836,6 +876,11 @@ ModSettings::entry_base* ModSettings::load_json_non_group(nlohmann::json& json)
 			et->_color = ImVec4(json["style"]["color"]["r"].get<float>(), json["style"]["color"]["g"].get<float>(), json["style"]["color"]["b"].get<float>(), json["style"]["color"]["a"].get<float>());
 		}
 		e = et;
+	} else if (type_str == "color") {
+		setting_color* sc = new setting_color();
+		sc->default_color = ImVec4(json["default"]["r"].get<float>(), json["default"]["g"].get<float>(), json["default"]["b"].get<float>(), json["default"]["a"].get<float>());
+		sc->color = sc->default_color;
+		e = sc;
 	} else {
 		INFO("Unknown setting type: {}", type_str);
 		return nullptr;
@@ -1014,6 +1059,12 @@ void ModSettings::populate_non_group_json(entry_base* entry, nlohmann::json& jso
 		for (auto& option : dropdown_setting->options) {
 			json["options"].push_back(option);
 		}
+	} else if (setting->type == entry_type::kEntryType_Color) {
+		auto color_setting = dynamic_cast<setting_color*>(entry);
+		json["default"]["r"] = color_setting->default_color.x;
+		json["default"]["g"] = color_setting->default_color.y;
+		json["default"]["b"] = color_setting->default_color.z;
+		json["default"]["a"] = color_setting->default_color.w;
 	}
 	
 }
@@ -1198,6 +1249,12 @@ void ModSettings::load_ini(mod_setting* mod)
 			dynamic_cast<setting_textbox*>(setting_ptr)->value = value;
 		} else if (setting_ptr->type == kEntryType_Dropdown) {
 			dynamic_cast<setting_dropdown*>(setting_ptr)->value = std::stoi(value);
+		} else if (setting_ptr->type == kEntryType_Color) {
+			uint32_t colUInt = std::stoul(value);
+			dynamic_cast<setting_color*>(setting_ptr)->color.x = ((colUInt >> IM_COL32_R_SHIFT) & 0xFF) / 255.0f;
+			dynamic_cast<setting_color*>(setting_ptr)->color.y = ((colUInt >> IM_COL32_G_SHIFT) & 0xFF) / 255.0f;
+			dynamic_cast<setting_color*>(setting_ptr)->color.z = ((colUInt >> IM_COL32_B_SHIFT) & 0xFF) / 255.0f;
+			dynamic_cast<setting_color*>(setting_ptr)->color.w = ((colUInt >> IM_COL32_A_SHIFT) & 0xFF) / 255.0f;
 		}
 	}
 	INFO(".ini loaded.");
@@ -1229,6 +1286,17 @@ void ModSettings::flush_ini(mod_setting* mod)
 			value = dynamic_cast<setting_textbox*>(setting)->value;
 		} else if (setting->type == kEntryType_Dropdown) {
 			value = std::to_string(dynamic_cast<setting_dropdown*>(setting)->value);
+		}
+		else if (setting->type == kEntryType_Color) {
+			// from imvec4 float to imu32
+			auto sc = dynamic_cast<setting_color*>(setting);
+			// Step 1: Extract components
+			uint32_t r = sc->color.x * 255.0f;
+			uint32_t g = sc->color.y * 255.f;
+			uint32_t b = sc->color.z * 255.f;
+			uint32_t a = sc->color.w * 255.f;
+			ImU32 col = IM_COL32(r, g, b, a);
+			value = std::to_string(col);
 		}
 		ini.SetValue(setting->ini_section.c_str(), setting->ini_id.c_str(), value.c_str());
 	}

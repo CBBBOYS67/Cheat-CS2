@@ -27,6 +27,7 @@ public:
 		kEntryType_Text,
 		kEntryType_Group,
 		kEntryType_Keymap,
+		kEntryType_Color,
 		kSettingType_Invalid
 	};
 
@@ -206,6 +207,27 @@ public:
 			value = default_value;
 			return changed;
 		}
+	};
+
+	class setting_color : public setting_base
+	{
+	public:
+		setting_color() {
+			type = kEntryType_Color;
+			name = Translatable("New Color");
+			color = { 0.f,
+				0.f,
+				0.f,
+				1.f };
+		}
+		bool reset() override
+		{
+			bool changed = color.x != default_color.x || color.y != default_color.y || color.z != default_color.z || color.w != default_color.w;
+			color = default_color;
+			return changed;
+		}
+		ImVec4 color;
+		ImVec4 default_color;
 	};
 
 	class setting_keymap : public setting_base

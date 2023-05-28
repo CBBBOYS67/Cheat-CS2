@@ -293,6 +293,8 @@ void AIM::show()
 				ImGui::Text(fmt::format("{:x}", _items[i].second->GetFormID()).c_str());
 				ImGui::EndTooltip();
 			}
+
+			// show item texture
 		}
 	}
 	ImGui::EndChild();
