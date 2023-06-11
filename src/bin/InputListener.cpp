@@ -332,10 +332,10 @@ static inline std::uint32_t GetGamepadIndex(RE::BSWin32GamepadDevice::Key a_key)
 
 	return index != kInvalid ? index + kGamepadOffset : kInvalid;
 }
-RE::BSEventNotifyControl InputListener::ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>* a_eventSource)
+void InputListener::ProcessEvent(RE::InputEvent** a_event)
 {
-	if (!a_event || !a_eventSource)
-		return RE::BSEventNotifyControl::kContinue;
+	if (!a_event)
+		return;
 
 	auto& io = ImGui::GetIO();
 
@@ -481,6 +481,5 @@ RE::BSEventNotifyControl InputListener::ProcessEvent(RE::InputEvent* const* a_ev
 			}
 		}
 	}
-
-	return RE::BSEventNotifyControl::kContinue;
+	return;
 }

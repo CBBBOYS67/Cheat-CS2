@@ -48,6 +48,8 @@ public:
 
 	static void flip();
 
+	static bool IsEnabled() { return enable; }
+
 	static float GetResolutionScaleWidth();   // { return ImGui::GetIO().DisplaySize.x / 1920.f; }
 	static float GetResolutionScaleHeight();  //{ return ImGui::GetIO().DisplaySize.y / 1080.f; }
 

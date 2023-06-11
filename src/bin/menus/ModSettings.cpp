@@ -1404,38 +1404,38 @@ void ModSettings::insert_all_game_setting()
 		insert_game_setting(mod);
 	}
 }
-
-bool ModSettings::API_RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback)
-{
-	INFO("Received registration for {} update.", a_mod);
-	for (auto mod : mods) {
-		if (mod->name == a_mod) {
-			mod->callbacks.push_back(a_callback);
-			INFO("Successfully added callback for {} update.", a_mod);
-			return true;
-		}
-	}
-	ERROR("{} mod not found.", a_mod);
-	return false;
-}
-
-
-
-namespace Example
-{
-	bool RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback) 
-	{
-		static auto dMenu = GetModuleHandle("dmenu");
-		using _RegisterForSettingUpdate = bool (*)(std::string, std::function<void()>);
-		static auto func = reinterpret_cast<_RegisterForSettingUpdate>(GetProcAddress(dMenu, "RegisterForSettingUpdate"));
-		if (func) {
-			return func(a_mod, a_callback);
-		}
-		return false;
-	}
-}
-
-extern "C" DLLEXPORT bool RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback)
-{
-	return ModSettings::API_RegisterForSettingUpdate(a_mod, a_callback);
-}
+//
+//bool ModSettings::API_RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback)
+//{
+//	INFO("Received registration for {} update.", a_mod);
+//	for (auto mod : mods) {
+//		if (mod->name == a_mod) {
+//			mod->callbacks.push_back(a_callback);
+//			INFO("Successfully added callback for {} update.", a_mod);
+//			return true;
+//		}
+//	}
+//	ERROR("{} mod not found.", a_mod);
+//	return false;
+//}
+//
+//
+//
+//namespace Example
+//{
+//	bool RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback) 
+//	{
+//		static auto dMenu = GetModuleHandle("dmenu");
+//		using _RegisterForSettingUpdate = bool (*)(std::string, std::function<void()>);
+//		static auto func = reinterpret_cast<_RegisterForSettingUpdate>(GetProcAddress(dMenu, "RegisterForSettingUpdate"));
+//		if (func) {
+//			return func(a_mod, a_callback);
+//		}
+//		return false;
+//	}
+//}
+//
+//extern "C" DLLEXPORT bool RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback)
+//{
+//	return ModSettings::API_RegisterForSettingUpdate(a_mod, a_callback);
+//}

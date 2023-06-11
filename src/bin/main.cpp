@@ -7,7 +7,6 @@ void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
 {
 	switch (a_msg->type) {
 	case SKSE::MessagingInterface::kDataLoaded:
-		RE::BSInputDeviceManager::GetSingleton()->AddEventSink(InputListener::GetSingleton());
 		Hooks::Install();
 		ModSettings::save_all_game_setting();  // in case some .esp overwrite the game setting // fixme
 		break;
@@ -110,9 +109,9 @@ extern "C" DLLEXPORT constinit auto SKSEPlugin_Version = []() {
 
 extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* a_skse)
 {
-    #ifndef NDEBUG
-	while (!IsDebuggerPresent()) { Sleep(100); }
-#endif
+//    #ifndef NDEBUG
+//	while (!IsDebuggerPresent()) { Sleep(100); }
+//#endif
 	REL::Module::reset();  // Clib-NG bug workaround
 
 	InitializeLog();

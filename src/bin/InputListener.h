@@ -1,7 +1,7 @@
 #pragma once
 #include "PCH.h"
 
-class InputListener : public RE::BSTEventSink<RE::InputEvent*>
+class InputListener
 {
 public:
 	static InputListener* GetSingleton()
@@ -10,5 +10,5 @@ public:
 		return std::addressof(listener);
 	}
 
-	virtual RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>* a_eventSource) override;
+	void ProcessEvent(RE::InputEvent** a_event);
 };

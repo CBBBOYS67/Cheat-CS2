@@ -186,10 +186,6 @@ void Renderer::flip()
 {
 	enable = !enable;
 	ImGui::GetIO().MouseDrawCursor = enable;
-	auto controlMap = RE::ControlMap::GetSingleton();
-	if (controlMap) {
-		controlMap->ignoreKeyboardMouse = enable;
-	}
 }
 
 

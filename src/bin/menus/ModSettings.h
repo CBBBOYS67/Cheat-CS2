@@ -299,7 +299,7 @@ public:
 	static void insert_all_game_setting();
 
 public:
-	static bool API_RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback);
+	static bool API_RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback) = delete;
 
 private:
 	static void show_reloadTranslationButton();

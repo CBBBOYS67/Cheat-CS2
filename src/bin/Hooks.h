@@ -17,6 +17,21 @@ namespace Hooks
 
 		static inline REL::Relocation<decltype(updateWeather)> _updateWeather;
 	};
+
+	class OnInputEventDispatch
+	{
+	public:
+		static void Install()
+		{
+			auto& trampoline = SKSE::GetTrampoline();
+			REL::Relocation<uintptr_t> caller{ RELOCATION_ID(67315, 68617) };
+			_DispatchInputEvent = trampoline.write_call<5>(caller.address() + RELOCATION_OFFSET(0x7B, 0x7B), DispatchInputEvent);
+		}
+
+	private:
+		static void DispatchInputEvent(RE::BSTEventSource<RE::InputEvent*>* a_dispatcher, RE::InputEvent** a_evns);
+		static inline REL::Relocation<decltype(DispatchInputEvent)> _DispatchInputEvent;
+	};
 	void Install();
 }
 
