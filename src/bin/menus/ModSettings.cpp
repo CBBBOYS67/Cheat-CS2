@@ -161,7 +161,7 @@ void ModSettings::show_entry_edit(entry_base* entry, mod_setting* mod)
 		{
 			setting_dropdown* dropdown = dynamic_cast<setting_dropdown*>(entry);
 			ImGui::Text("Dropdown options");
-			ImGui::BeginChild("##dropdown_items", ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize);
+			if (ImGui::BeginChild("##dropdown_items", ImVec2(0, 200), true, ImGuiWindowFlags_AlwaysAutoResize))
 			{
 				int buf;
 				if (ImGui::InputInt("Default", &buf, 0, 100)) {
@@ -195,7 +195,7 @@ void ModSettings::show_entry_edit(entry_base* entry, mod_setting* mod)
 		{
 			// color palette to set text color
 			ImGui::Text("Text color");
-			ImGui::BeginChild("##text_color", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize);
+			if (ImGui::BeginChild("##text_color", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize))
 			{
 				entry_text* text = dynamic_cast<entry_text*>(entry);
 				float colorArray[4] = { text->_color.x, text->_color.y, text->_color.z, text->_color.w };
@@ -211,7 +211,7 @@ void ModSettings::show_entry_edit(entry_base* entry, mod_setting* mod)
 	{
 			// color palette to set text color
 			ImGui::Text("Color");
-			ImGui::BeginChild("##color", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize);
+			if (ImGui::BeginChild("##color", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize))
 			{
 				setting_color* color = dynamic_cast<setting_color*>(entry);
 				float colorArray[4] = { color->default_color.x, color->default_color.y, color->default_color.z, color->default_color.w };
@@ -219,6 +219,18 @@ void ModSettings::show_entry_edit(entry_base* entry, mod_setting* mod)
 					color->default_color = ImVec4(colorArray[0], colorArray[1], colorArray[2], colorArray[3]);
 					edited = true;
 				}
+				ImGui::EndChild();
+			}
+			break;
+	}
+	case kEntryType_Keymap:
+	{
+			// color palette to set text color
+			ImGui::Text("Keymap");
+			if (ImGui::BeginChild("##keymap", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize))
+			{
+				setting_keymap* keymap = dynamic_cast<setting_keymap*>(entry);
+				ImGui::InputInt("Default Key ID", &(keymap->default_value));
 				ImGui::EndChild();
 			}
 			break;
@@ -521,22 +533,24 @@ void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
 		{
 			setting_keymap* k = dynamic_cast<setting_keymap*>(entry);
 			ImGui::SetNextItemWidth(width);
-			ImGui::Text("%s", std::to_string(k->value));
+			ImGui::Text(setting_keymap::keyid_to_str(k->value));
 			ImGui::SameLine();
 			ImGui::Text("%s", k->name.get());
 			ImGui::SameLine();
 			if (ImGui::Button("Remap")) {
-				ImGui::BeginPopupModal("keymapPopUp");
+				ImGui::OpenPopup("Rebind Key");
 				keyMapListening = k;
 			}
-			if (ImGui::BeginPopup("keymapPopUp")) {
+			if (ImGui::BeginPopupModal("Rebind Key")) {
 				ImGui::Text("Enter the key you wish to map");
 				if (keyMapListening == nullptr) {
+					edited = true;
 					ImGui::CloseCurrentPopup();
 				}
 				ImGui::EndPopup();
 			}
 		}
+		break;
 	case kEntryType_Color:
 		{
 			setting_color* c = dynamic_cast<setting_color*>(entry);
@@ -553,6 +567,7 @@ void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
 				}
 			}
 		}
+		break;
 	default:
 		break;
 	}
@@ -786,6 +801,8 @@ inline std::string ModSettings::get_type_str(entry_type t)
 		return "group";
 	case entry_type::kEntryType_Color:
 		return "color";
+	case entry_type::kEntryType_Keymap:
+		return "keymap";
 	default:
 		return "invalid";
 	}
@@ -885,6 +902,11 @@ ModSettings::entry_base* ModSettings::load_json_non_group(nlohmann::json& json)
 		sc->default_color = ImVec4(json["default"]["r"].get<float>(), json["default"]["g"].get<float>(), json["default"]["b"].get<float>(), json["default"]["a"].get<float>());
 		sc->color = sc->default_color;
 		e = sc;
+	} else if (type_str == "keymap") {
+		setting_keymap* skm = new setting_keymap();
+		skm->default_value = json["default"].get<int>();
+		skm->value = skm->default_value;
+		e = skm;
 	} else {
 		INFO("Unknown setting type: {}", type_str);
 		return nullptr;
@@ -1069,6 +1091,9 @@ void ModSettings::populate_non_group_json(entry_base* entry, nlohmann::json& jso
 		json["default"]["g"] = color_setting->default_color.y;
 		json["default"]["b"] = color_setting->default_color.z;
 		json["default"]["a"] = color_setting->default_color.w;
+	} else if (setting->type == entry_type::kEntryType_Keymap) {
+		auto keymap_setting = dynamic_cast<setting_keymap*>(entry);
+		json["default"] = keymap_setting->default_value;
 	}
 	
 }
@@ -1259,6 +1284,8 @@ void ModSettings::load_ini(mod_setting* mod)
 			dynamic_cast<setting_color*>(setting_ptr)->color.y = ((colUInt >> IM_COL32_G_SHIFT) & 0xFF) / 255.0f;
 			dynamic_cast<setting_color*>(setting_ptr)->color.z = ((colUInt >> IM_COL32_B_SHIFT) & 0xFF) / 255.0f;
 			dynamic_cast<setting_color*>(setting_ptr)->color.w = ((colUInt >> IM_COL32_A_SHIFT) & 0xFF) / 255.0f;
+		} else if (setting_ptr->type == kEntryType_Keymap) {
+			dynamic_cast<setting_keymap*>(setting_ptr)->value = std::stoi(value);
 		}
 	}
 	INFO(".ini loaded.");
@@ -1301,6 +1328,8 @@ void ModSettings::flush_ini(mod_setting* mod)
 			uint32_t a = sc->color.w * 255.f;
 			ImU32 col = IM_COL32(r, g, b, a);
 			value = std::to_string(col);
+		} else if (setting->type == kEntryType_Keymap) {
+			value = std::to_string(dynamic_cast<setting_keymap*>(setting)->value);
 		}
 		ini.SetValue(setting->ini_section.c_str(), setting->ini_id.c_str(), value.c_str());
 	}
@@ -1354,6 +1383,16 @@ void ModSettings::flush_game_setting(mod_setting* mod)
 		} else if (setting->type == kEntryType_Dropdown) {
 			//s->SetUnsignedInteger(dynamic_cast<setting_dropdown*>(setting_ptr)->value);
 			s->SetInteger(dynamic_cast<setting_dropdown*>(setting)->value);
+		} else if (setting->type == kEntryType_Keymap) {
+			s->SetInteger(dynamic_cast<setting_keymap*>(setting)->value);
+		} else if (setting->type == kEntryType_Color) {
+			setting_color* sc = dynamic_cast<setting_color*>(setting);
+			uint32_t r = sc->color.x * 255.0f;
+			uint32_t g = sc->color.y * 255.f;
+			uint32_t b = sc->color.z * 255.f;
+			uint32_t a = sc->color.w * 255.f;
+			ImU32 col = IM_COL32(r, g, b, a);
+			s->SetUnsignedInteger(col);
 		}
 	}
 }
@@ -1443,3 +1482,265 @@ void ModSettings::insert_all_game_setting()
 //{
 //	return ModSettings::API_RegisterForSettingUpdate(a_mod, a_callback);
 //}
+
+const char* ModSettings::setting_keymap::keyid_to_str(int key_id)
+{
+	switch (key_id) {
+	case 1:
+		return "Escape";
+	case 2:
+		return "1";
+	case 3:
+		return "2";
+	case 4:
+		return "3";
+	case 5:
+		return "4";
+	case 6:
+		return "5";
+	case 7:
+		return "6";
+	case 8:
+		return "7";
+	case 9:
+		return "8";
+	case 10:
+		return "9";
+	case 11:
+		return "0";
+	case 12:
+		return "Minus";
+	case 13:
+		return "Equals";
+	case 14:
+		return "Backspace";
+	case 15:
+		return "Tab";
+	case 16:
+		return "Q";
+	case 17:
+		return "W";
+	case 18:
+		return "E";
+	case 19:
+		return "R";
+	case 20:
+		return "T";
+	case 21:
+		return "Y";
+	case 22:
+		return "U";
+	case 23:
+		return "I";
+	case 24:
+		return "O";
+	case 25:
+		return "P";
+	case 26:
+		return "Left Bracket";
+	case 27:
+		return "Right Bracket";
+	case 28:
+		return "Enter";
+	case 29:
+		return "Left Control";
+	case 30:
+		return "A";
+	case 31:
+		return "S";
+	case 32:
+		return "D";
+	case 33:
+		return "F";
+	case 34:
+		return "G";
+	case 35:
+		return "H";
+	case 36:
+		return "J";
+	case 37:
+		return "K";
+	case 38:
+		return "L";
+	case 39:
+		return "Semicolon";
+	case 40:
+		return "Apostrophe";
+	case 41:
+		return "~ (Console)";
+	case 42:
+		return "Left Shift";
+	case 43:
+		return "Back Slash";
+	case 44:
+		return "Z";
+	case 45:
+		return "X";
+	case 46:
+		return "C";
+	case 47:
+		return "V";
+	case 48:
+		return "B";
+	case 49:
+		return "N";
+	case 50:
+		return "M";
+	case 51:
+		return "Comma";
+	case 52:
+		return "Period";
+	case 53:
+		return "Forward Slash";
+	case 54:
+		return "Right Shift";
+	case 55:
+		return "NUM*";
+	case 56:
+		return "Left Alt";
+	case 57:
+		return "Spacebar";
+	case 58:
+		return "Caps Lock";
+	case 59:
+		return "F1";
+	case 60:
+		return "F2";
+	case 61:
+		return "F3";
+	case 62:
+		return "F4";
+	case 63:
+		return "F5";
+	case 64:
+		return "F6";
+	case 65:
+		return "F7";
+	case 66:
+		return "F8";
+	case 67:
+		return "F9";
+	case 68:
+		return "F10";
+	case 69:
+		return "Num Lock";
+	case 70:
+		return "Scroll Lock";
+	case 71:
+		return "NUM7";
+	case 72:
+		return "NUM8";
+	case 73:
+		return "NUM9";
+	case 74:
+		return "NUM-";
+	case 75:
+		return "NUM4";
+	case 76:
+		return "NUM5";
+	case 77:
+		return "NUM6";
+	case 78:
+		return "NUM+";
+	case 79:
+		return "NUM1";
+	case 80:
+		return "NUM2";
+	case 81:
+		return "NUM3";
+	case 82:
+		return "NUM0";
+	case 83:
+		return "NUM.";
+	case 87:
+		return "F11";
+	case 88:
+		return "F12";
+	case 156:
+		return "NUM Enter";
+	case 157:
+		return "Right Control";
+	case 181:
+		return "NUM/";
+	case 183:
+		return "SysRq / PtrScr";
+	case 184:
+		return "Right Alt";
+	case 197:
+		return "Pause";
+	case 199:
+		return "Home";
+	case 200:
+		return "Up Arrow";
+	case 201:
+		return "PgUp";
+	case 203:
+		return "Left Arrow";
+	case 205:
+		return "Right Arrow";
+	case 207:
+		return "End";
+	case 208:
+		return "Down Arrow";
+	case 209:
+		return "PgDown";
+	case 210:
+		return "Insert";
+	case 211:
+		return "Delete";
+	case 256:
+		return "Left Mouse Button";
+	case 257:
+		return "Right Mouse Button";
+	case 258:
+		return "Middle/Wheel Mouse Button";
+	case 259:
+		return "Mouse Button 3";
+	case 260:
+		return "Mouse Button 4";
+	case 261:
+		return "Mouse Button 5";
+	case 262:
+		return "Mouse Button 6";
+	case 263:
+		return "Mouse Button 7";
+	case 264:
+		return "Mouse Wheel Up";
+	case 265:
+		return "Mouse Wheel Down";
+	case 266:
+		return "DPAD_UP";
+	case 267:
+		return "DPAD_DOWN";
+	case 268:
+		return "DPAD_LEFT";
+	case 269:
+		return "DPAD_RIGHT";
+	case 270:
+		return "START";
+	case 271:
+		return "BACK";
+	case 272:
+		return "LEFT_THUMB";
+	case 273:
+		return "RIGHT_THUMB";
+	case 274:
+		return "LEFT_SHOULDER";
+	case 275:
+		return "RIGHT_SHOULDER";
+	case 276:
+		return "A";
+	case 277:
+		return "B";
+	case 278:
+		return "X";
+	case 279:
+		return "Y";
+	case 280:
+		return "LT";
+	case 281:
+		return "RT";
+	default:
+		return "Unknown Key";
+	}
+}

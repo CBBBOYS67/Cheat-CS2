@@ -239,8 +239,9 @@ public:
 			value = 0;
 			default_value = 0;
 		}
-		uint32_t value;
-		uint32_t default_value;
+		int value;
+		int default_value;
+		static const char* keyid_to_str(int key_id);
 	};
 
 	/* Settings of one mod, represented by one .json file and serialized to one .ini file.*/
