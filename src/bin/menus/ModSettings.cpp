@@ -541,6 +541,10 @@ void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
 				ImGui::OpenPopup("Rebind Key");
 				keyMapListening = k;
 			}
+			ImGui::SameLine();
+			if (ImGui::Button("Unmap")) {
+				k->value = 0;
+			}
 			if (ImGui::BeginPopupModal("Rebind Key")) {
 				ImGui::Text("Enter the key you wish to map");
 				if (keyMapListening == nullptr) {
@@ -596,6 +600,7 @@ void ModSettings::show_entries(std::vector<entry_base*>& entries, mod_setting* m
 		ImGui::Indent();
 		// edit entry
 		bool entry_deleted = false;
+		bool all_entries_deleted = false;
 
 		if (edit_mode) {
 			if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
@@ -647,8 +652,14 @@ void ModSettings::show_entries(std::vector<entry_base*>& entries, mod_setting* m
 						setting_checkbox* checkbox = (setting_checkbox*)entry;
 						m_checkbox_toggle.erase(checkbox->control_id);
 					}
+					bool should_decrement = it != entries.begin();
 					it = entries.erase(it);
-					it--;
+					if (should_decrement) {
+						it--;
+					}
+					if (it == entries.end()) {
+						all_entries_deleted = true;
+					}
 					edited = true;
 					delete entry;
 					entry_deleted = true;
@@ -673,6 +684,9 @@ void ModSettings::show_entries(std::vector<entry_base*>& entries, mod_setting* m
 
 		ImGui::Unindent();
 		ImGui::PopID();
+		if (all_entries_deleted) {
+			break;
+		}
 	}
 
 		// add entry
@@ -1486,6 +1500,8 @@ void ModSettings::insert_all_game_setting()
 const char* ModSettings::setting_keymap::keyid_to_str(int key_id)
 {
 	switch (key_id) {
+	case 0: 
+		return "Unmapped";
 	case 1:
 		return "Escape";
 	case 2:
