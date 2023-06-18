@@ -109,12 +109,11 @@ extern "C" DLLEXPORT constinit auto SKSEPlugin_Version = []() {
 
 extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* a_skse)
 {
-//    #ifndef NDEBUG
-//	while (!IsDebuggerPresent()) { Sleep(100); }
-//#endif
 	REL::Module::reset();  // Clib-NG bug workaround
 
 	InitializeLog();
+	
+	
 	logger::info("{} v{}"sv, Plugin::NAME, Plugin::VERSION.string());
 
 	SKSE::Init(a_skse);
@@ -126,22 +125,5 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* a_s
 	
 	onSKSEInit();
 
-
 	return true;
 }
-
-
-//extern "C" DLLEXPORT void* SKSEAPI RequestPluginAPI(const VAL_API::InterfaceVersion a_interfaceVersion)
-//{
-//	//auto api = Messaging::TrueHUDInterface::GetSingleton();
-//	auto api = ModAPI::VALInterface::GetSingleton();
-//	logger::info("ValhallaCombat::RequestPluginAPI called");
-//
-//	switch (a_interfaceVersion) {
-//	case VAL_API::InterfaceVersion::V1:
-//		logger::info("ValhallaCombat::RequestPluginAPI returned the API singleton");
-//		return static_cast<void*>(api);
-//	}
-//	logger::info("ValhallaCombat::RequestPluginAPI requested the wrong interface version");
-//	return nullptr;
-//}

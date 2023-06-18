@@ -580,6 +580,8 @@ void ModSettings::show_entries(std::vector<entry_base*>& entries, mod_setting* m
 
 		ImGui::Indent();
 		// edit entry
+		bool entry_deleted = false;
+
 		if (edit_mode) {
 			if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
 				if (it != entries.begin()) {
@@ -634,9 +636,9 @@ void ModSettings::show_entries(std::vector<entry_base*>& entries, mod_setting* m
 					it--;
 					edited = true;
 					delete entry;
+					entry_deleted = true;
 					// TODO: delete everything in a group if deleting group.
 					ImGui::CloseCurrentPopup();
-					continue;
 				}
 				ImGui::SetItemDefaultFocus();
 				ImGui::SameLine();
@@ -650,7 +652,9 @@ void ModSettings::show_entries(std::vector<entry_base*>& entries, mod_setting* m
 
 		}
 
-		show_entry(entry, mod);
+		if (!entry_deleted) {
+			show_entry(entry, mod);
+		}
 
 		ImGui::Unindent();
 		ImGui::PopID();
