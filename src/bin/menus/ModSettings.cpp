@@ -532,11 +532,6 @@ void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
 	case kEntryType_Keymap:
 		{
 			setting_keymap* k = dynamic_cast<setting_keymap*>(entry);
-			ImGui::SetNextItemWidth(width);
-			ImGui::Text(setting_keymap::keyid_to_str(k->value));
-			ImGui::SameLine();
-			ImGui::Text("%s", k->name.get());
-			ImGui::SameLine();
 			if (ImGui::Button("Remap")) {
 				ImGui::OpenPopup("Rebind Key");
 				keyMapListening = k;
@@ -545,6 +540,11 @@ void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
 			if (ImGui::Button("Unmap")) {
 				k->value = 0;
 			}
+			ImGui::SameLine();
+			ImGui::Text("%s:", k->name.get());
+			ImGui::SameLine();
+			ImGui::Text(setting_keymap::keyid_to_str(k->value));
+
 			if (ImGui::BeginPopupModal("Rebind Key")) {
 				ImGui::Text("Enter the key you wish to map");
 				if (keyMapListening == nullptr) {
