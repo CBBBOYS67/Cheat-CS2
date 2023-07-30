@@ -81,6 +81,18 @@ void ModSettings::show_saveButton()
     }
 }
 
+void ModSettings::show_cancelButton()
+{
+	bool unsaved_changes = !ini_dirty_mods.empty();
+
+	if (ImGui::Button("Cancel", ImVec2(120, 30))) {
+		for (auto& mod : ini_dirty_mods) {
+			load_ini(mod);
+		}
+		ini_dirty_mods.clear();
+	}
+}
+
 void ModSettings::show_saveJsonButton()
 {
 	bool unsaved_changes = !json_dirty_mods.empty();
@@ -825,6 +837,8 @@ inline std::string ModSettings::get_type_str(entry_type t)
 void ModSettings::show()
 {
 	show_saveButton();
+	ImGui::SameLine();
+	show_cancelButton();
 	if (edit_mode) {
 		ImGui::SameLine();
 		show_saveJsonButton();

@@ -191,7 +191,7 @@ void Renderer::D3DInitHook::thunk()
 #else
 #endif
 	if (foundCustomFont) {
-		ImGui::GetIO().Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 64.0f, NULL, glyphRanges);
+		ImGui::GetIO().Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 32.0f, NULL, glyphRanges);
 	}
 	SetupImGuiStyle();
 

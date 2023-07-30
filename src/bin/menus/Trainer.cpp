@@ -210,10 +210,10 @@ namespace World
 			auto data = RE::TESDataHandler::GetSingleton();
 			// load region&weather names
 			for (RE::TESWeather* weather : data->GetFormArray<RE::TESWeather>()) {
-				_weatherNames.insert({ weather, Utils::getFormEditorID(weather) });
+				_weatherNames.insert({ weather, weather->GetFormEditorID() });
 			}
 			for (RE::TESRegion* region : data->GetFormArray<RE::TESRegion>()) {
-				_regionNames.insert({ region, Utils::getFormEditorID(region) });
+				_regionNames.insert({ region, region->GetFormEditorID() });
 			}
 		}
 	}

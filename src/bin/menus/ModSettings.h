@@ -305,6 +305,7 @@ public:
 private:
 	static void show_reloadTranslationButton();
 	static void show_saveButton();
+	static void show_cancelButton();
 	static void show_saveJsonButton();
 
 	
