@@ -43,7 +43,11 @@ namespace ini
 		loader.setActiveSection("Localization");
 		uint32_t lan;
 		loader.load(lan, "language");
-		Settings::currLanguage = static_cast<Translator::Language>(lan);
+		if (lan >= static_cast<uint32_t>(Translator::Language::English) && lan < static_cast<uint32_t>(Translator::Language::Invalid))
+			Settings::currLanguage = static_cast<Translator::Language>(lan);
+		else { 
+			Settings::currLanguage = Translator::Language::English;
+		}
 	}
 
 	void init()
