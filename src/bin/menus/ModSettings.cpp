@@ -50,7 +50,7 @@ using json = nlohmann::json;
 void ModSettings::show_reloadTranslationButton()
 {
 	if (ImGui::Button("Reload Translation")) {
-		Translator::LoadTranslations(Settings::currLanguage);
+		Translator::ReLoadTranslations();
 	}
 }
   // not used anymore, we auto save.
@@ -829,7 +829,7 @@ void ModSettings::show()
 		ImGui::SameLine();
 		show_saveJsonButton();
 		ImGui::SameLine();
-		show_reloadTranslationButton();
+		//show_reloadTranslationButton();
 	}
 	// a button on the rhs of this same line
 	ImGui::SameLine(ImGui::GetWindowWidth() - 100.0f);  // Move cursor to the right side of the window

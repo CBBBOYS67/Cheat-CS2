@@ -2,40 +2,14 @@
 
 class Translator
 {
-	using TranslationID = std::string;
-
 public:
-	enum Language
-	{
-		English,
-		German,
-		French,
-		Spanish,
-		Italian,
-		Russian,
-		Polish,
-		Portuguese,
-		Japanese,
-		Chinese,
-		Korean,
-		Turkish,
-		Arabic,
-		Invalid
-	};
-
-	static std::string AsLanguageStr(Language language);
-
-	static Language _language;  // language to translate to, from translation id
-
-	static void LoadTranslations(Language language);
+	static void ReLoadTranslations();
 
 	// translate a string to the current language. Returns a null-pointer if the matching translation is not found.
-	static const char* Translate(TranslationID id);
-
-	static void LoadTranslation(std::filesystem::path txt_path);
+	static const char* Translate(std::string id);
 
 private:
-	static inline std::unordered_map<TranslationID, std::string> _translations;
+	static inline std::unordered_map<std::string, std::pair<bool, std::string>> _translations; // id -> {has_translation, translated text}
 };
 
 

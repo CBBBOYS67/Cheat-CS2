@@ -13,8 +13,6 @@ public:
 
 	static inline float fontScale = 1.f;
 
-	static inline Translator::Language currLanguage = Translator::Language::English;
-
 	static void show();
 
 	static void init();

@@ -6,8 +6,6 @@
 #include <imgui_impl_win32.h>
 
 #include <dxgi.h>
-
-#define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
 
 #include "dMenu.h"
@@ -41,6 +39,55 @@ LRESULT Renderer::WndProcHook::thunk(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 	}
 
 	return func(hWnd, uMsg, wParam, lParam);
+}
+
+
+void SetupImGuiStyle()
+{
+	auto& style = ImGui::GetStyle();
+	auto& colors = style.Colors;
+
+	// Theme from https://github.com/ArranzCNL/ImprovedCameraSE-NG
+
+	style.WindowTitleAlign = ImVec2(0.5, 0.5);
+	style.FramePadding = ImVec2(4, 4);
+
+	// Rounded slider grabber
+	style.GrabRounding = 12.0f;
+
+	// Window
+	colors[ImGuiCol_WindowBg] = ImVec4{ 0.118f, 0.118f, 0.118f, 0.784f };
+	colors[ImGuiCol_ResizeGrip] = ImVec4{ 0.2f, 0.2f, 0.2f, 0.5f };
+	colors[ImGuiCol_ResizeGripHovered] = ImVec4{ 0.3f, 0.3f, 0.3f, 0.75f };
+	colors[ImGuiCol_ResizeGripActive] = ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f };
+
+	// Header
+	colors[ImGuiCol_Header] = ImVec4{ 0.2f, 0.2f, 0.2f, 1.0f };
+	colors[ImGuiCol_HeaderHovered] = ImVec4{ 0.3f, 0.3f, 0.3f, 1.0f };
+	colors[ImGuiCol_HeaderActive] = ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f };
+
+	// Title
+	colors[ImGuiCol_TitleBg] = ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f };
+	colors[ImGuiCol_TitleBgActive] = ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f };
+	colors[ImGuiCol_TitleBgCollapsed] = ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f };
+
+	// Frame Background
+	colors[ImGuiCol_FrameBg] = ImVec4{ 0.2f, 0.2f, 0.2f, 1.0f };
+	colors[ImGuiCol_FrameBgHovered] = ImVec4{ 0.3f, 0.3f, 0.3f, 1.0f };
+	colors[ImGuiCol_FrameBgActive] = ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f };
+
+	// Button
+	colors[ImGuiCol_Button] = ImVec4{ 0.2f, 0.2f, 0.2f, 1.0f };
+	colors[ImGuiCol_ButtonHovered] = ImVec4{ 0.3f, 0.3f, 0.3f, 1.0f };
+	colors[ImGuiCol_ButtonActive] = ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f };
+
+	// Tab
+	colors[ImGuiCol_Tab] = ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f };
+	colors[ImGuiCol_TabHovered] = ImVec4{ 0.38f, 0.38f, 0.38f, 1.0f };
+	colors[ImGuiCol_TabActive] = ImVec4{ 0.28f, 0.28f, 0.28f, 1.0f };
+	colors[ImGuiCol_TabUnfocused] = ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f };
+	colors[ImGuiCol_TabUnfocusedActive] = ImVec4{ 0.2f, 0.2f, 0.2f, 1.0f };
+
 }
 
 void Renderer::D3DInitHook::thunk()
@@ -97,30 +144,56 @@ void Renderer::D3DInitHook::thunk()
 		ERROR("SetWindowLongPtrA failed!");
 
 // initialize font selection here
-	#define SETTINGFILE_PATH "Data\\SKSE\\Plugins\\dmenu\\dmenu.ini"
-	settingsLoader loader(SETTINGFILE_PATH);
-	loader.setActiveSection("Localization");
-	uint32_t lan;
-	loader.load(lan, "language");
-	
-	auto& io = ImGui::GetIO();
-	ImFont* font = nullptr;
-	switch ((Translator::Language)lan) {
-	case Translator::Language::English:
-		break;
-	case Translator::Language::Chinese:
-		io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 16.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
-		break;
-	case Translator::Language::Japanese:
-		// load japanese font
-		break;
-	case Translator::Language::Korean:
-		// load korean font
-		break;
-	default:
-		//unknown language
-		break;
+	INFO("Building font atlas...");
+	std::filesystem::path fontPath;
+	bool foundCustomFont = false;
+	const ImWchar* glyphRanges = 0;
+#define FONTSETTING_PATH "Data\\SKSE\\Plugins\\dMenu\\fonts\\FontConfig.ini"
+	CSimpleIniA ini;
+	ini.LoadFile(FONTSETTING_PATH);
+	if (!ini.IsEmpty()) {
+		const char* language = ini.GetValue("config", "font", 0);
+		if (language) {
+			std::string fontDir = R"(Data\SKSE\Plugins\dMenu\fonts\)" + std::string(language);
+			// check if folder exists
+			if (std::filesystem::exists(fontDir) && std::filesystem::is_directory(fontDir)) {
+				for (const auto& entry : std::filesystem::directory_iterator(fontDir)) {
+					auto entryPath = entry.path();
+					if (entryPath.extension() == ".ttf" || entryPath.extension() == ".ttc") {
+						fontPath = entryPath;
+						foundCustomFont = true;
+						break;
+					}
+				}
+			}
+			if (foundCustomFont) {
+				if (language = "Chinese") {
+					glyphRanges = ImGui::GetIO().Fonts->GetGlyphRangesChineseFull();
+				} else if (language == "Korean") {
+					glyphRanges = ImGui::GetIO().Fonts->GetGlyphRangesKorean();
+				} else if (language == "Japanese") {
+					glyphRanges = ImGui::GetIO().Fonts->GetGlyphRangesJapanese();
+				} else if (language == "Thai") {
+					glyphRanges = ImGui::GetIO().Fonts->GetGlyphRangesThai();
+				} else if (language == "Vietnamese") {
+					glyphRanges = ImGui::GetIO().Fonts->GetGlyphRangesVietnamese();
+				} else if (language == "Cyrillic") {
+					glyphRanges = ImGui::GetIO().Fonts->GetGlyphRangesCyrillic();
+				}
+			}
+		}
 	}
+#define ENABLE_FREETYPE 0
+#if ENABLE_FREETYPE
+	ImFontAtlas* atlas = ImGui::GetIO().Fonts;
+	atlas->FontBuilderIO = ImGuiFreeType::GetBuilderForFreeType();
+	atlas->FontBuilderFlags = ImGuiFreeTypeBuilderFlags_LightHinting;
+#else
+#endif
+	if (foundCustomFont) {
+		ImGui::GetIO().Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 64.0f, NULL, glyphRanges);
+	}
+	SetupImGuiStyle();
 
 }
 
