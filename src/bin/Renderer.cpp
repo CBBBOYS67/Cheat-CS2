@@ -49,8 +49,8 @@ void SetupImGuiStyle()
 
 	// Theme from https://github.com/ArranzCNL/ImprovedCameraSE-NG
 
-	style.WindowTitleAlign = ImVec2(0.5, 0.5);
-	style.FramePadding = ImVec2(4, 4);
+	//style.WindowTitleAlign = ImVec2(0.5, 0.5);
+	//style.FramePadding = ImVec2(4, 4);
 
 	// Rounded slider grabber
 	style.GrabRounding = 12.0f;
@@ -167,7 +167,7 @@ void Renderer::D3DInitHook::thunk()
 				}
 			}
 			if (foundCustomFont) {
-				if (language = "Chinese") {
+				if (language == "Chinese") {
 					glyphRanges = ImGui::GetIO().Fonts->GetGlyphRangesChineseFull();
 				} else if (language == "Korean") {
 					glyphRanges = ImGui::GetIO().Fonts->GetGlyphRangesKorean();
