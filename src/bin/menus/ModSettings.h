@@ -302,6 +302,8 @@ public:
 public:
 	static bool API_RegisterForSettingUpdate(std::string a_mod, std::function<void()> a_callback) = delete;
 
+	static void SendAllSettingsUpdateEvent();
+
 private:
 	static void show_reloadTranslationButton();
 	static void show_saveButton();
@@ -317,7 +319,7 @@ private:
 	static void show_entries(std::vector<entry_base*>& entries, mod_setting* mod);
 	
 	static void SendSettingsUpdateEvent(std::string& modName);
-	
+
 
 	static inline bool edit_mode = false;
 };

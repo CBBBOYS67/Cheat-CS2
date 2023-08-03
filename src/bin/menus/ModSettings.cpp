@@ -47,6 +47,12 @@ inline bool ModSettings::entry_base::Control::satisfied()
 
 using json = nlohmann::json;
 
+void ModSettings::SendAllSettingsUpdateEvent()
+{
+	for (auto& mod : mods) {
+		SendSettingsUpdateEvent(mod->name);
+	}
+}
 void ModSettings::show_reloadTranslationButton()
 {
 	if (ImGui::Button("Reload Translation")) {
