@@ -308,6 +308,8 @@ private:
 	static void show_cancelButton();
 	static void show_saveJsonButton();
 
+	static void show_buttons_window();
+
 	
 	static void show_modSetting(mod_setting* mod);
 	static void show_entry_edit(entry_base* base, mod_setting* mod);

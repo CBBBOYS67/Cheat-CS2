@@ -13,6 +13,8 @@ public:
 
 	static inline float fontScale = 1.f;
 
+	static inline uint32_t key_toggle_dmenu = 199;
+
 	static void show();
 
 	static void init();

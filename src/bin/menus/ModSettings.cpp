@@ -64,7 +64,7 @@ void ModSettings::show_saveButton()
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.9f, 0.5f, 1.0f));
     }
 
-    if (ImGui::Button("Save", ImVec2(120, 30))) {
+    if (ImGui::Button("Save")) {
 		for (auto& mod : ini_dirty_mods) {
 			flush_ini(mod);
 			flush_game_setting(mod);
@@ -85,7 +85,7 @@ void ModSettings::show_cancelButton()
 {
 	bool unsaved_changes = !ini_dirty_mods.empty();
 
-	if (ImGui::Button("Cancel", ImVec2(120, 30))) {
+	if (ImGui::Button("Cancel")) {
 		for (auto& mod : ini_dirty_mods) {
 			load_ini(mod);
 		}
@@ -103,7 +103,7 @@ void ModSettings::show_saveJsonButton()
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.9f, 0.5f, 1.0f));
 	}
 
-	if (ImGui::Button("Save Config", ImVec2(120, 30))) {
+	if (ImGui::Button("Save Config")) {
 		for (auto& mod : json_dirty_mods) {
 			flush_json(mod);
 		}
@@ -113,6 +113,28 @@ void ModSettings::show_saveJsonButton()
 	if (unsaved_changes) {
 		ImGui::PopStyleColor(3);
 	}
+}
+
+void ModSettings::show_buttons_window()
+{
+	ImVec2 mainWindowSize = ImGui::GetWindowSize();
+	ImVec2 mainWindowPos = ImGui::GetWindowPos();
+	
+	ImVec2 buttonsWindowSize = ImVec2(mainWindowSize.x * 0.15, mainWindowSize.y * 0.1);
+
+	ImGui::SetNextWindowPos(ImVec2(mainWindowPos.x + mainWindowSize.x, mainWindowPos.y + mainWindowSize.y - buttonsWindowSize.y));
+	ImGui::SetNextWindowSize(buttonsWindowSize);  // Adjust the height as needed
+	ImGui::Begin("Buttons", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+	show_saveButton();
+	ImGui::SameLine();
+	show_cancelButton();
+	if (edit_mode) {
+		ImGui::SameLine();
+		show_saveJsonButton();
+		ImGui::SameLine();
+		//show_reloadTranslationButton();
+	}
+	ImGui::End();
 }
 
 
@@ -544,20 +566,27 @@ void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
 	case kEntryType_Keymap:
 		{
 			setting_keymap* k = dynamic_cast<setting_keymap*>(entry);
+			std::string hash = std::to_string((unsigned long long)(void**)k);
 			if (ImGui::Button("Remap")) {
-				ImGui::OpenPopup("Rebind Key");
+				ImGui::OpenPopup(hash.data());
 				keyMapListening = k;
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("Unmap")) {
 				k->value = 0;
+				edited = true;
 			}
 			ImGui::SameLine();
 			ImGui::Text("%s:", k->name.get());
 			ImGui::SameLine();
 			ImGui::Text(setting_keymap::keyid_to_str(k->value));
 
-			if (ImGui::BeginPopupModal("Rebind Key")) {
+			if (!k->desc.empty()) {
+				ImGui::SameLine();
+				ImGui::HoverNote(k->desc.get());
+			}
+
+			if (ImGui::BeginPopupModal(hash.data())) {
 				ImGui::Text("Enter the key you wish to map");
 				if (keyMapListening == nullptr) {
 					edited = true;
@@ -581,6 +610,10 @@ void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
 				if (ImGui::IsKeyPressed(ImGuiKey_R)) {
 					edited |= color->reset();
 				}
+			}
+			if (!c->desc.empty()) {
+				ImGui::SameLine();
+				ImGui::HoverNote(c->desc.get());
 			}
 		}
 		break;
@@ -786,15 +819,9 @@ inline void ModSettings::SendSettingsUpdateEvent(std::string& modName)
 
 void ModSettings::show_modSetting(mod_setting* mod)
 {
-	// Set window padding and item spacing
-	const float padding = 8.0f;
-	const float spacing = 8.0f;
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(padding, padding));
-	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing, spacing));
 
 	show_entries(mod->entries, mod);
 
-	ImGui::PopStyleVar(2);
 }
 
 
@@ -836,20 +863,17 @@ inline std::string ModSettings::get_type_str(entry_type t)
 
 void ModSettings::show()
 {
-	show_saveButton();
-	ImGui::SameLine();
-	show_cancelButton();
-	if (edit_mode) {
-		ImGui::SameLine();
-		show_saveJsonButton();
-		ImGui::SameLine();
-		//show_reloadTranslationButton();
-	}
+	
 	// a button on the rhs of this same line
 	ImGui::SameLine(ImGui::GetWindowWidth() - 100.0f);  // Move cursor to the right side of the window
 	ImGui::ToggleButton("Edit Config", &edit_mode);
 
-	
+		// Set window padding and item spacing
+	const float padding = 8.0f;
+	const float spacing = 8.0f;
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(padding, padding));
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing, spacing));
+
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 	for (auto& mod : mods) {
 		if (ImGui::CollapsingHeader(mod->name.c_str())) {
@@ -857,6 +881,10 @@ void ModSettings::show()
 		}
 	}
 	ImGui::PopStyleColor();
+	
+	ImGui::PopStyleVar();
+
+	show_buttons_window();
 }
 
 static const std::string SETTINGS_DIR = "Data\\SKSE\\Plugins\\\dmenu\\customSettings";
@@ -1290,31 +1318,52 @@ void ModSettings::load_ini(mod_setting* mod)
 		}
 		// Get the value of this setting from the ini file
 		std::string value;
+		bool use_default = false;
 		if (ini.KeyExists(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str())) {
 			value = ini.GetValue(setting_ptr->ini_section.c_str(), setting_ptr->ini_id.c_str(), "");
 		} else {
-			INFO(".ini file for {} has no value for {}. Creating a new .ini file.", mod->name, setting_ptr->name.get());
-			flush_ini(mod);
-			return;
+			INFO("Value not found for setting {} in .ini file. Using default entry value.", setting_ptr->name.def);
+			use_default = true;
 		}
-		// Convert the value to the appropriate type and assign it to the setting
-		if (setting_ptr->type == kEntryType_Checkbox) {
-			dynamic_cast<setting_checkbox*>(setting_ptr)->value = (value == "true");
-		} else if (setting_ptr->type == kEntryType_Slider) {
-			dynamic_cast<setting_slider*>(setting_ptr)->value = std::stof(value);
-		} else if (setting_ptr->type == kEntryType_Textbox) {
-			dynamic_cast<setting_textbox*>(setting_ptr)->value = value;
-		} else if (setting_ptr->type == kEntryType_Dropdown) {
-			dynamic_cast<setting_dropdown*>(setting_ptr)->value = std::stoi(value);
-		} else if (setting_ptr->type == kEntryType_Color) {
-			uint32_t colUInt = std::stoul(value);
-			dynamic_cast<setting_color*>(setting_ptr)->color.x = ((colUInt >> IM_COL32_R_SHIFT) & 0xFF) / 255.0f;
-			dynamic_cast<setting_color*>(setting_ptr)->color.y = ((colUInt >> IM_COL32_G_SHIFT) & 0xFF) / 255.0f;
-			dynamic_cast<setting_color*>(setting_ptr)->color.z = ((colUInt >> IM_COL32_B_SHIFT) & 0xFF) / 255.0f;
-			dynamic_cast<setting_color*>(setting_ptr)->color.w = ((colUInt >> IM_COL32_A_SHIFT) & 0xFF) / 255.0f;
-		} else if (setting_ptr->type == kEntryType_Keymap) {
-			dynamic_cast<setting_keymap*>(setting_ptr)->value = std::stoi(value);
+		if (use_default) {
+			// Convert the value to the appropriate type and assign it to the setting
+			if (setting_ptr->type == kEntryType_Checkbox) {
+				dynamic_cast<setting_checkbox*>(setting_ptr)->value = dynamic_cast<setting_checkbox*>(setting_ptr)->default_value;
+			} else if (setting_ptr->type == kEntryType_Slider) {
+				dynamic_cast<setting_slider*>(setting_ptr)->value = dynamic_cast<setting_slider*>(setting_ptr)->default_value;
+			} else if (setting_ptr->type == kEntryType_Textbox) {
+				dynamic_cast<setting_textbox*>(setting_ptr)->value = dynamic_cast<setting_textbox*>(setting_ptr)->default_value;
+			} else if (setting_ptr->type == kEntryType_Dropdown) {
+				dynamic_cast<setting_dropdown*>(setting_ptr)->value = dynamic_cast<setting_dropdown*>(setting_ptr)->default_value;
+			} else if (setting_ptr->type == kEntryType_Color) {
+				dynamic_cast<setting_color*>(setting_ptr)->color.x = dynamic_cast<setting_color*>(setting_ptr)->default_color.x;
+				dynamic_cast<setting_color*>(setting_ptr)->color.y = dynamic_cast<setting_color*>(setting_ptr)->default_color.y;
+				dynamic_cast<setting_color*>(setting_ptr)->color.z = dynamic_cast<setting_color*>(setting_ptr)->default_color.z;
+				dynamic_cast<setting_color*>(setting_ptr)->color.w = dynamic_cast<setting_color*>(setting_ptr)->default_color.w;
+			} else if (setting_ptr->type == kEntryType_Keymap) {
+				dynamic_cast<setting_keymap*>(setting_ptr)->value = dynamic_cast<setting_keymap*>(setting_ptr)->default_value;
+			}
+		} else {
+			// Convert the value to the appropriate type and assign it to the setting
+			if (setting_ptr->type == kEntryType_Checkbox) {
+				dynamic_cast<setting_checkbox*>(setting_ptr)->value = (value == "true");
+			} else if (setting_ptr->type == kEntryType_Slider) {
+				dynamic_cast<setting_slider*>(setting_ptr)->value = std::stof(value);
+			} else if (setting_ptr->type == kEntryType_Textbox) {
+				dynamic_cast<setting_textbox*>(setting_ptr)->value = value;
+			} else if (setting_ptr->type == kEntryType_Dropdown) {
+				dynamic_cast<setting_dropdown*>(setting_ptr)->value = std::stoi(value);
+			} else if (setting_ptr->type == kEntryType_Color) {
+				uint32_t colUInt = std::stoul(value);
+				dynamic_cast<setting_color*>(setting_ptr)->color.x = ((colUInt >> IM_COL32_R_SHIFT) & 0xFF) / 255.0f;
+				dynamic_cast<setting_color*>(setting_ptr)->color.y = ((colUInt >> IM_COL32_G_SHIFT) & 0xFF) / 255.0f;
+				dynamic_cast<setting_color*>(setting_ptr)->color.z = ((colUInt >> IM_COL32_B_SHIFT) & 0xFF) / 255.0f;
+				dynamic_cast<setting_color*>(setting_ptr)->color.w = ((colUInt >> IM_COL32_A_SHIFT) & 0xFF) / 255.0f;
+			} else if (setting_ptr->type == kEntryType_Keymap) {
+				dynamic_cast<setting_keymap*>(setting_ptr)->value = std::stoi(value);
+			}
 		}
+
 	}
 	INFO(".ini loaded.");
 }

@@ -21,6 +21,8 @@ namespace ini
 		loader.save(Settings::windowPos_y, "windowPos_y");
 		loader.save(Settings::lockWindowSize, "lockWindowSize");
 		loader.save(Settings::lockWindowPos, "lockWindowPos");
+		loader.save(Settings::key_toggle_dmenu, "key_toggle_dmenu");
+		loader.save(Settings::fontScale, "fontScale");
 
 
 		loader.flush();
@@ -36,6 +38,9 @@ namespace ini
 		loader.load(Settings::windowPos_y, "windowPos_y");
 		loader.load(Settings::lockWindowSize, "lockWindowSize");
 		loader.load(Settings::lockWindowPos, "lockWindowPos");
+		loader.load(Settings::key_toggle_dmenu, "key_toggle_dmenu");
+		loader.load(Settings::fontScale, "fontScale");
+
 
 	}
 
@@ -85,7 +90,8 @@ namespace UI
 		if (ImGui::SliderFloat("Font Size", &Settings::fontScale, 0.5f, 2.f)) {
 			ImGui::GetIO().FontGlobalScale = Settings::fontScale;
 		}
-		ImGui::SameLine();
+
+		ImGui::InputInt("Toggle Key", (int*)&Settings::key_toggle_dmenu);
 	}
 }
 
@@ -121,7 +127,7 @@ void Settings::show()
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 
 
-	if (ImGui::Button("Save", ImVec2(100, 30))) {
+	if (ImGui::Button("Save")) {
 		ini::flush();
 	}
 
