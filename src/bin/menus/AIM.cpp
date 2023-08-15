@@ -83,109 +83,19 @@ inline void cacheItems(RE::TESDataHandler* a_data)
 {
 	RE::TESFile* selectedMod = _mods[_selectedModIndex].first;
 	for (auto form : a_data->GetFormArray<T>()) {
-		if (form && form->GetFile() == selectedMod 
-			&& strl(form->GetName()) != 0) {
-			_items.push_back({ form->GetName(), form });
-		}
-	}
-}
-
-namespace QUIHelper
-{
-	static inline RE::TESObjectCONT* _container = nullptr;
-	static inline RE::ObjectRefHandle _containerRef{};
-	static inline RE::TESObjectCELL* _cell = nullptr;
-	void InitContainer()
-	{
-		auto factoryCELL = RE::IFormFactory::GetConcreteFormFactoryByType<RE::TESObjectCELL>();
-		_cell = factoryCELL ? factoryCELL->Create() : nullptr;
-		if (!_cell) {
-			logger::error("Failed to create cell");
-			return;
-		}
-
-		auto handler = RE::TESDataHandler::GetSingleton();
-		auto lighting = handler->LookupForm<RE::BGSLightingTemplate>(RE::FormID(0x300E2), "Skyrim.esm");
-		if (!lighting) {
-			logger::error("Failed to lookup default lighting template");
-			return;
-		}
-
-		_cell->SetFormEditorID("QUIPluginExplorerCELL");
-		_cell->fullName = "QUIPluginExplorerCELL";
-		_cell->cellFlags.set(RE::TESObjectCELL::Flag::kIsInteriorCell);
-
-		auto factoryCONT = RE::IFormFactory::GetConcreteFormFactoryByType<RE::TESObjectCONT>();
-		_container = factoryCONT ? factoryCONT->Create() : nullptr;
-		if (!_container) {
-			logger::error("Failed to create container");
-			return;
-		}
-
-		_container->SetFormEditorID("QUIPluginExplorerCONT");
-		_container->fullName = "QUIPluginExplorerContainer";
-		_container->boundData = { { 0, 0, 0 }, { 0, 0, 0 } };
-	}
-	void InitContainerRef()
-	{
-		auto factoryREFR = RE::IFormFactory::GetConcreteFormFactoryByType<RE::TESObjectREFR>();
-		auto containerRef = factoryREFR ? factoryREFR->Create() : nullptr;
-		if (!containerRef) {
-			logger::error("Failed to create container reference");
-			return;
-		}
-
-		auto player = RE::PlayerCharacter::GetSingleton();
-		auto playerRef = player->GetObjectReference();
-		containerRef->formFlags |= RE::TESForm::RecordFlags::kTemporary;
-		containerRef->data.objectReference = _container;
-		containerRef->extraList.SetOwner(playerRef);
-		containerRef->SetParentCell(_cell);
-		containerRef->SetStartingPosition({ 0, 0, 0 });
-		_containerRef = containerRef->CreateRefHandle();
-	}
-	RE::TESObjectREFRPtr GetContainer()
-	{
-		auto ref = _containerRef.get();
-		if (ref)
-			return ref;
-
-		InitContainerRef();
-		return _containerRef.get();
-	}
-	void inspect()
-	{
-		INFO("geting container");
-		auto container = GetContainer();
-		if (!container || container->IsActivationBlocked())
-			return;
-
-		INFO("got container");
-		container->SetDisplayName("QUIContainer", true);
-
-		/*auto inv = container->GetInventory();
-		for (auto& [obj, data] : inv) {
-			auto& [count, entry] = data;
-			if (count > 0 && entry) {
-				container->RemoveItem(obj, count, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+		if (selectedMod->IsFormInMod(form->GetFormID())
+			&& form->GetFullNameLength() != 0) {
+			std::string name = form->GetFullName();
+			if (form->IsArmor()) {
+				if (form->As<RE::TESObjectARMO>()->IsHeavyArmor()) {
+					name += " (Heavy)";
+				} else {
+					name += " (Light)";
+				}
 			}
-		}*/
-
-		for (auto item : _items) {
-			//container->AddObjectToContainer(item.second->LoadObjectBound(), nullptr, 1, nullptr);
+			_items.push_back({ name, form });
 		}
-
-		INFO("activating container");
-		auto player = RE::PlayerCharacter::GetSingleton();
-		INFO("got player");
-		bool success = container->ActivateRef(player, 0, nullptr, 0, false);
-		INFO("activated ref");
-		if (!success) {
-			logger::warn("Could not call `Activate` on ObjectReference");
-		}
-
 	}
-
 }
 
 /* Present all filtered items to the user under the "Items" section*/

@@ -270,10 +270,24 @@ void ModSettings::show_entry_edit(entry_base* entry, mod_setting* mod)
 			if (ImGui::BeginChild("##keymap", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize))
 			{
 				setting_keymap* keymap = dynamic_cast<setting_keymap*>(entry);
-				ImGui::InputInt("Default Key ID", &(keymap->default_value));
+				if (ImGui::InputInt("Default Key ID", &(keymap->default_value))) {
+					edited = true;
+				}
 				ImGui::EndChild();
 			}
 			break;
+	}
+	case kEntryType_Button:
+	{
+			ImGui::Text("Button");
+			if (ImGui::BeginChild("##button", ImVec2(0, 100), true, ImGuiWindowFlags_AlwaysAutoResize))
+			{
+				entry_button* button = dynamic_cast<entry_button*>(entry);
+				if (ImGui::InputText("ID", &(button->id))) {
+					edited = true;
+				}
+				ImGui::EndChild();
+			}
 	}
 	default:
 		break;
@@ -623,6 +637,19 @@ void ModSettings::show_entry(entry_base* entry, mod_setting* mod)
 			}
 		}
 		break;
+	case kEntryType_Button:
+	{
+			entry_button* b = dynamic_cast<entry_button*>(entry);
+			if (ImGui::Button(b->name.get())) {
+				// trigger button callback
+				std::string custom_event_name = "dmenu_buttonCallback";
+				send_mod_callback_event(custom_event_name, b->id);
+			}
+			if (!b->desc.empty()) {
+				ImGui::SameLine();
+				ImGui::HoverNote(b->desc.get());
+			}
+	}
 	default:
 		break;
 	}
@@ -799,7 +826,12 @@ void ModSettings::show_entries(std::vector<entry_base*>& entries, mod_setting* m
 				edited = true;
 				INFO("added entry");
 			}
-
+			if (ImGui::Selectable("Button")) {
+				entry_button* button = new entry_button();
+				entries.push_back(button);
+				edited = true;
+				INFO("added entry");
+			}
 			ImGui::EndPopup();
 		}
 	}
@@ -818,6 +850,18 @@ inline void ModSettings::SendSettingsUpdateEvent(std::string& modName)
 	SKSE::ModCallbackEvent callbackEvent;
 	callbackEvent.eventName = "dmenu_updateSettings";
 	callbackEvent.strArg = modName;
+	eventSource->SendEvent(&callbackEvent);
+}
+
+void ModSettings::send_mod_callback_event(std::string& mod_name, std::string& str_arg)
+{
+	auto eventSource = SKSE::GetModCallbackEventSource();
+	if (!eventSource) {
+		return;
+	}
+	SKSE::ModCallbackEvent callbackEvent;
+	callbackEvent.eventName = mod_name.data();
+	callbackEvent.strArg = str_arg.data();
 	eventSource->SendEvent(&callbackEvent);
 }
 
@@ -862,6 +906,8 @@ inline std::string ModSettings::get_type_str(entry_type t)
 		return "color";
 	case entry_type::kEntryType_Keymap:
 		return "keymap";
+	case entry_type::kEntryType_Button:
+		return "button";
 	default:
 		return "invalid";
 	}
@@ -969,6 +1015,10 @@ ModSettings::entry_base* ModSettings::load_json_non_group(nlohmann::json& json)
 		skm->default_value = json["default"].get<int>();
 		skm->value = skm->default_value;
 		e = skm;
+	} else if (type_str == "button") {
+		entry_button* sb = new entry_button();
+		sb->id = json["id"].get<std::string>();
+		e = sb;
 	} else {
 		INFO("Unknown setting type: {}", type_str);
 		return nullptr;
@@ -1114,6 +1164,9 @@ void ModSettings::populate_non_group_json(entry_base* entry, nlohmann::json& jso
 			json["style"]["color"]["g"] = dynamic_cast<entry_text*>(entry)->_color.y;
 			json["style"]["color"]["b"] = dynamic_cast<entry_text*>(entry)->_color.z;
 			json["style"]["color"]["a"] = dynamic_cast<entry_text*>(entry)->_color.w;
+		} else if (entry->type == entry_type::kEntryType_Button) {
+			auto button = dynamic_cast<entry_button*>(entry);
+			json["id"] = button->id;
 		}
 		return;  // no need to continue, the following fields are only for settings
 	}

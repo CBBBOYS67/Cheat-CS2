@@ -28,6 +28,7 @@ public:
 		kEntryType_Group,
 		kEntryType_Keymap,
 		kEntryType_Color,
+		kEntryType_Button,
 		kSettingType_Invalid
 	};
 
@@ -243,6 +244,21 @@ public:
 		int default_value;
 		static const char* keyid_to_str(int key_id);
 	};
+	
+	class entry_button : public entry_base
+	{
+	public:
+		entry_button()
+		{
+			type = kEntryType_Button;
+			name = Translatable("New Button");
+			id = "";
+		}
+		std::string id;
+		bool is_setting() const override {
+			return false;
+		}
+	};
 
 	/* Settings of one mod, represented by one .json file and serialized to one .ini file.*/
 	class mod_setting
@@ -319,6 +335,7 @@ private:
 	static void show_entries(std::vector<entry_base*>& entries, mod_setting* mod);
 	
 	static void SendSettingsUpdateEvent(std::string& modName);
+	static void send_mod_callback_event(std::string& mod_name, std::string& str_arg);
 
 
 	static inline bool edit_mode = false;
