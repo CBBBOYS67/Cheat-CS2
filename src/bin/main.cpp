@@ -9,6 +9,7 @@ void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
 	case SKSE::MessagingInterface::kDataLoaded:
 		Hooks::Install();
 		ModSettings::save_all_game_setting();  // in case some .esp overwrite the game setting // fixme
+		ModSettings::SendAllSettingsUpdateEvent(); // notify all mods to update their settings
 		break;
 	case SKSE::MessagingInterface::kPostLoad:
 		break;
@@ -21,7 +22,6 @@ void onSKSEInit()
 {
 	Renderer::Install();
 	Settings::init();
-	Translator::LoadTranslations(Settings::currLanguage);
 	ModSettings::init(); // init modsetting before everyone else
 }
 

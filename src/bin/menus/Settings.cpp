@@ -21,10 +21,9 @@ namespace ini
 		loader.save(Settings::windowPos_y, "windowPos_y");
 		loader.save(Settings::lockWindowSize, "lockWindowSize");
 		loader.save(Settings::lockWindowPos, "lockWindowPos");
+		loader.save(Settings::key_toggle_dmenu, "key_toggle_dmenu");
+		loader.save(Settings::fontScale, "fontScale");
 
-		loader.setActiveSection("Localization");
-		uint32_t lan = static_cast<uint32_t>(Settings::currLanguage);
-		loader.save(lan, "language");
 
 		loader.flush();
 	}
@@ -39,15 +38,10 @@ namespace ini
 		loader.load(Settings::windowPos_y, "windowPos_y");
 		loader.load(Settings::lockWindowSize, "lockWindowSize");
 		loader.load(Settings::lockWindowPos, "lockWindowPos");
+		loader.load(Settings::key_toggle_dmenu, "key_toggle_dmenu");
+		loader.load(Settings::fontScale, "fontScale");
 
-		loader.setActiveSection("Localization");
-		uint32_t lan;
-		loader.load(lan, "language");
-		if (lan >= static_cast<uint32_t>(Translator::Language::English) && lan < static_cast<uint32_t>(Translator::Language::Invalid))
-			Settings::currLanguage = static_cast<Translator::Language>(lan);
-		else { 
-			Settings::currLanguage = Translator::Language::English;
-		}
+
 	}
 
 	void init()
@@ -96,47 +90,11 @@ namespace UI
 		if (ImGui::SliderFloat("Font Size", &Settings::fontScale, 0.5f, 2.f)) {
 			ImGui::GetIO().FontGlobalScale = Settings::fontScale;
 		}
-		ImGui::SameLine();
+
+		ImGui::InputInt("Toggle Key", (int*)&Settings::key_toggle_dmenu);
 	}
 }
 
-namespace Localization
-{
-	std::vector<std::pair<Translator::Language, std::string>> _languages = {
-		{Translator::Language::English, "English"},
-		{Translator::Language::German, "German"},
-		{Translator::Language::French, "French"},
-		{Translator::Language::Spanish, "Spanish"},
-		{Translator::Language::Italian, "Italian"},
-		{Translator::Language::Russian, "Russian"},
-		{Translator::Language::Polish, "Polish"},
-		{Translator::Language::Portuguese, "Portuguese"},
-		{Translator::Language::Japanese, "Japanese"},
-		{Translator::Language::Chinese, "Chinese"},
-		{Translator::Language::Korean, "Korean"},
-		{Translator::Language::Turkish, "Turkish"},
-		{Translator::Language::Arabic, "Arabic"},
-	};
-	void init()
-	{
-	}
-
-	void show()
-	{
-		if (ImGui::BeginCombo("Language", _languages[(int)Settings::currLanguage].second.c_str())) {
-			for (int i = 0; i < _languages.size(); i++) {
-				bool isSelected = ((int)Settings::currLanguage == i);
-				if (ImGui::Selectable(_languages[i].second.c_str(), isSelected)) {
-					Settings::currLanguage = static_cast<Translator::Language>(i);
-				}
-			}
-			ImGui::EndCombo();
-		}
-		ImGui::SameLine();
-		Utils::imgui::HoverNote("Language change takes place after game re-start.", "(!)");
-
-	}
-}
 
 void Settings::show() 
 {
@@ -155,13 +113,6 @@ void Settings::show()
 	ImGui::Separator();
 	ImGui::Spacing();
 
-	// Display Localization controls
-	ImGui::Text("Localization");
-	Localization::show();
-	ImGui::Spacing();
-	ImGui::Separator();
-	ImGui::Spacing();
-
 	// Unindent the contents of the window
 	ImGui::Unindent();
 
@@ -176,7 +127,7 @@ void Settings::show()
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 
 
-	if (ImGui::Button("Save", ImVec2(100, 30))) {
+	if (ImGui::Button("Save")) {
 		ini::flush();
 	}
 
@@ -191,7 +142,6 @@ void Settings::init()
 {
 	ini::init(); // load all settings first
 	UI::init();
-	Localization::init();
 		
 	INFO("Settings initialized.");
 }

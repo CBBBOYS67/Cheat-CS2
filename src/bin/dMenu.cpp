@@ -12,6 +12,11 @@
 #include "Renderer.h"
 void DMenu::draw() 
 {
+	ImVec2 screenSize = ImGui::GetMainViewport()->Size;
+	float screenSizeX = screenSize.x;
+	float screenSizeY = screenSize.y;
+	ImGui::SetNextWindowSize(ImVec2(Settings::relative_window_size_h * screenSizeX, Settings::relative_window_size_v * screenSizeY));
+	
 	ImGuiWindowFlags windowFlags = ImGuiWindowFlags_None;
 	if (Settings::lockWindowPos) {
 		windowFlags |= ImGuiWindowFlags_NoMove;
@@ -71,6 +76,7 @@ void DMenu::init(float a_screenWidth, float a_screenHeight)
 	ImGui::SetNextWindowSize(mainWindowSize, ImGuiCond_FirstUseEver);
 	ImVec2 mainWindowPos = { Settings::windowPos_x, Settings::windowPos_y };
 	ImGui::SetNextWindowSize(mainWindowPos, ImGuiCond_FirstUseEver);
+	ImGui::GetIO().FontGlobalScale = Settings::fontScale;
 
 	INFO("DMenu initialized");
 	

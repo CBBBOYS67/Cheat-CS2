@@ -9,6 +9,7 @@
 #include "Renderer.h"
 
 #include "menus/ModSettings.h"
+#include "menus/Settings.h"
 
 // enum : uint32_t
 // {
@@ -466,7 +467,7 @@ void InputListener::ProcessEvent(RE::InputEvent** a_event)
 				break;
 			case RE::INPUT_DEVICE::kKeyboard:
 				io.AddKeyEvent(ImGui_ImplWin32_VirtualKeyToImGuiKey(key), button->IsPressed());
-				if (button->GetIDCode() == 199) { // home
+				if (button->GetIDCode() == Settings::key_toggle_dmenu) { // home
 					if (button->IsDown()) {
 						Renderer::flip();
 					}
